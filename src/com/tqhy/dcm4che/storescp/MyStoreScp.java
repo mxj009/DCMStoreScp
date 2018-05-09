@@ -41,7 +41,7 @@ import java.util.concurrent.ScheduledExecutorService;
 public class MyStoreScp implements Callable<String> {
 
     private static final Logger LOG = LoggerFactory.getLogger(MyStoreScp.class);
-    private static ResourceBundle rb = ResourceBundle.getBundle("org.dcm4che3.tool.storescp.messages");
+    private static ResourceBundle rb = ResourceBundle.getBundle("messages");
     private final Device device;
     private final ApplicationEntity ae;
     private final Connection conn;
@@ -71,15 +71,21 @@ public class MyStoreScp implements Callable<String> {
     private final BasicCStoreSCP cstoreSCP = new BasicCStoreSCP(new String[]{"*"}) {
         protected void store(Association as, PresentationContext pc, Attributes rq, PDVInputStream data, Attributes rsp) throws IOException {
             rsp.setInt(2304, VR.US, new int[]{status});
+            System.out.println("MyStoreScp store() start..");
             if (storageDir != null) {
                 String cuid = rq.getString(2);
                 String iuid = rq.getString(4096);
                 String tsuid = pc.getTransferSyntax();
+                /*System.out.println("#############################################################");
+                System.out.println("MyStore store rq.toString(): " + rq.toString());
+                System.out.println("MyStore store rsp.toString(): " + rsp.toString());
+                System.out.println("#############################################################");*/
                 File file = new File(storageDir, iuid + ".part");
 
                 try {
                     storeTo(as, as.createFileMetaInformation(iuid, cuid, tsuid), data, file);
-                    renameTo(as, file, new File(storageDir, filePathFormat == null ? iuid : filePathFormat.format(parse(file))));
+                    System.out.println("MyStore store complete..."+file.getAbsolutePath());
+                    //renameTo(as, file, new File(storageDir, filePathFormat == null ? iuid : filePathFormat.format(parse(file))));
                 } catch (Exception var11) {
                     deleteFile(as, file);
                     throw new DicomServiceException(272, var11);
@@ -129,7 +135,6 @@ public class MyStoreScp implements Callable<String> {
 
     private Attributes parse(File file) throws IOException {
         DicomInputStream in = new DicomInputStream(file);
-
         Attributes var2;
         try {
             in.setIncludeBulkData(DicomInputStream.IncludeBulkData.NO);
@@ -153,7 +158,7 @@ public class MyStoreScp implements Callable<String> {
     private DicomServiceRegistry createServiceRegistry() {
         DicomServiceRegistry serviceRegistry = new DicomServiceRegistry();
         serviceRegistry.addDicomService(new BasicCEchoSCP());
-        serviceRegistry.addDicomService(this.cstoreSCP);
+        serviceRegistry.addDicomService(cstoreSCP);
         return serviceRegistry;
     }
 
@@ -175,9 +180,11 @@ public class MyStoreScp implements Callable<String> {
 
     @Override
     public String call() throws Exception {
+        System.out.println("MyStoreScp call() start...");
         if (null == connectConfig) {
             return "连接配置为空";
         }
+        System.out.println("aeTitle: " + connectConfig.getAeTitle() + " hostName: " + connectConfig.getHost() + " port: " + connectConfig.getPort());
         configureConnect(conn, connectConfig);
         bindConnect(conn, ae, connectConfig);
         //main.setStatus(CLIUtils.getIntOption(cl, "status", 0));
@@ -256,15 +263,19 @@ public class MyStoreScp implements Callable<String> {
             //hostName可以为null
             conn.setHostname(connectConfig.getHost());
 
-            String port = connectConfig.getPort();
-            conn.setPort(StringUtils.isNotEmpty(port) ? Integer.parseInt(port) : ConnectConfig.DEFAULT_PORT);
+            int port = connectConfig.getPort();
+            conn.setPort(port == 0 ? ConnectConfig.DEFAULT_PORT : port);
 
             String aeTitle = connectConfig.getAeTitle();
             ae.setAETitle(StringUtils.isNotEmpty(aeTitle) ? aeTitle : ConnectConfig.DEFAULT_AE_TITLE);
+            System.out.println("MyStoreScp bingConnect() complete...");
         }
     }
 
     private void configureStorageDirectory(StorageDirectoryConfig sdConfig) {
+        if (null == sdConfig) {
+            sdConfig = new StorageDirectoryConfig();
+        }
         if (!sdConfig.isIgnore()) {
             String directory = sdConfig.getDirectory();
             setStorageDirectory(new File(StringUtils.isNotEmpty(directory) ? directory : StorageDirectoryConfig.DEFAULT_DIRECTORY));
@@ -276,7 +287,11 @@ public class MyStoreScp implements Callable<String> {
 
     }
 
-    private static void configureTransferCapability(ApplicationEntity ae, TransferCapabilityConfig tcConfig) throws IOException {
+    private void configureTransferCapability(ApplicationEntity ae, TransferCapabilityConfig tcConfig) throws IOException {
+        if (null == tcConfig) {
+            return;
+        }
+
         if (tcConfig.isAcceptUnknown()) {
             ae.addTransferCapability(new TransferCapability((String) null, "*", TransferCapability.Role.SCP, new String[]{"*"}));
         } else {
