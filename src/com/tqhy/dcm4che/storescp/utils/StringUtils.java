@@ -25,8 +25,9 @@ public class StringUtils {
         while ((delimPos = s.indexOf(delim, delimPos + 1)) >= 0)
             count++;
 
-        if (count == 1)
+        if (count == 1) {
             return new String[]{s};
+        }
 
         String[] ss = new String[count];
         int delimPos2 = s.length();
