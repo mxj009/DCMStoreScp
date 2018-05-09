@@ -1,5 +1,6 @@
 package com.tqhy.dcm4che.storescp.configs;
 
+import com.tqhy.dcm4che.storescp.enums.msg.ConnConfigMsg;
 import com.tqhy.dcm4che.storescp.utils.StringUtils;
 
 /**
@@ -14,7 +15,7 @@ public class ConnectConfig {
 
     private String host;
     private String aeTitle;
-    private String port;
+    private int port;
     private String proxy;
     private int maxPdulenRcv;
     private int maxPdulenSnd;
@@ -34,18 +35,43 @@ public class ConnectConfig {
     private boolean notPackPdv;
     private boolean notTcpDelay;
 
-    public ConnectConfig(String aeAtHostPort) {
-        String[] aeHostPort = StringUtils.split(aeAtHostPort, '@');
-        String[] hostPort = StringUtils.split(aeHostPort[1], ':');
-        this.aeTitle = aeHostPort[0];
-        this.host = hostPort[0];
-        this.port = hostPort[1];
+    public ConnConfigMsg init(String aeAtHostPort) {
+        //[<aet>[@<ip>]:]<port>
+        if (StringUtils.isNotEmpty(aeAtHostPort)) {
+            String[] aeHostPort = StringUtils.split(aeAtHostPort, '@');
+            System.out.println("ConnectConfig aeAtHostPort: " + aeAtHostPort);
+            if (aeHostPort.length == 2) {
+                String[] hostPort = StringUtils.split(aeHostPort[1], ':');
+                System.out.println("hostPort hostPort: " + aeAtHostPort);
+                this.aeTitle = aeHostPort[0];
+                this.host = hostPort[0];
+                return initHostPort(hostPort);
+            } else {
+                String[] hostPort = StringUtils.split(aeHostPort[0], ':');
+                if (hostPort.length == 2) {
+                    this.aeTitle = hostPort[0];
+                    return initHostPort(hostPort);
+                }
+            }
+            return ConnConfigMsg.SUCCESS;
+        }
+        return ConnConfigMsg.FAILURE;
+    }
+
+    private ConnConfigMsg initHostPort(String[] hostPort) {
+        try {
+            this.port = Integer.parseInt(hostPort[1]);
+            return ConnConfigMsg.SUCCESS;
+        } catch (NumberFormatException e) {
+            e.printStackTrace();
+            return ConnConfigMsg.PORT_NOT_NUMBER_ERROR;
+        }
     }
 
     public ConnectConfig() {
     }
 
-    public ConnectConfig(String host, String aeTitle, String port) {
+    public ConnectConfig(String host, String aeTitle, int port) {
         this.host = host;
         this.aeTitle = aeTitle;
         this.port = port;
@@ -67,11 +93,11 @@ public class ConnectConfig {
         this.aeTitle = aeTitle;
     }
 
-    public String getPort() {
+    public int getPort() {
         return port;
     }
 
-    public void setPort(String port) {
+    public void setPort(int port) {
         this.port = port;
     }
 
