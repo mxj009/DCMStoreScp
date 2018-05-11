@@ -5,7 +5,7 @@ package com.tqhy.dcm4che.storescp.configs;
  * @create 2018/5/8
  * @since 1.0.0
  */
-public class StorageDirectoryConfig {
+public class StorageConfig {
 
     private boolean ignore;
     private String directory;
@@ -19,10 +19,10 @@ public class StorageDirectoryConfig {
     private String filePath;
     public static final String DEFAULT_DIRECTORY = ".";
 
-    public StorageDirectoryConfig() {
+    public StorageConfig() {
     }
 
-    public StorageDirectoryConfig(boolean ignore, String directory, String filePath) {
+    public StorageConfig(boolean ignore, String directory, String filePath) {
         this.ignore = ignore;
         this.directory = directory;
         this.filePath = filePath;
