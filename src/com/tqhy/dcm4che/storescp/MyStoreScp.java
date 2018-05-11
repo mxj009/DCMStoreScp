@@ -1,13 +1,15 @@
 package com.tqhy.dcm4che.storescp;
 
 import com.tqhy.dcm4che.storescp.configs.ConnectConfig;
-import com.tqhy.dcm4che.storescp.configs.StorageDirectoryConfig;
+import com.tqhy.dcm4che.storescp.configs.StorageConfig;
 import com.tqhy.dcm4che.storescp.configs.TransferCapabilityConfig;
+import com.tqhy.dcm4che.storescp.entity.ImgCase;
+import com.tqhy.dcm4che.storescp.enums.msg.BaseMsg;
+import com.tqhy.dcm4che.storescp.enums.msg.ConnConfigMsg;
+import com.tqhy.dcm4che.storescp.excel.ExcelTask;
 import com.tqhy.dcm4che.storescp.utils.StringUtils;
-import org.apache.commons.cli.ParseException;
 import org.dcm4che3.data.Attributes;
 import org.dcm4che3.data.VR;
-import org.dcm4che3.io.DicomInputStream;
 import org.dcm4che3.io.DicomOutputStream;
 import org.dcm4che3.net.*;
 import org.dcm4che3.net.pdu.PresentationContext;
@@ -23,13 +25,12 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.ServerSocket;
+import java.net.Socket;
 import java.util.Iterator;
 import java.util.Properties;
 import java.util.ResourceBundle;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.*;
 
 /**
  * 文件上传服务端,文件接收
@@ -38,7 +39,7 @@ import java.util.concurrent.ScheduledExecutorService;
  * @create 2018/5/8
  * @since 1.0.0
  */
-public class MyStoreScp implements Callable<String> {
+public class MyStoreScp implements Callable<Enum> {
 
     private static final Logger LOG = LoggerFactory.getLogger(MyStoreScp.class);
     private static ResourceBundle rb = ResourceBundle.getBundle("messages");
@@ -66,7 +67,7 @@ public class MyStoreScp implements Callable<String> {
     /**
      * 存储路径及方式配置
      */
-    private StorageDirectoryConfig sdConfig;
+    private StorageConfig sdConfig;
 
     private final BasicCStoreSCP cstoreSCP = new BasicCStoreSCP(new String[]{"*"}) {
         protected void store(Association as, PresentationContext pc, Attributes rq, PDVInputStream data, Attributes rsp) throws IOException {
@@ -84,8 +85,9 @@ public class MyStoreScp implements Callable<String> {
 
                 try {
                     storeTo(as, as.createFileMetaInformation(iuid, cuid, tsuid), data, file);
-                    System.out.println("MyStore store complete..."+file.getAbsolutePath());
+                    System.out.println("MyStore store complete..." + file.getAbsolutePath());
                     //renameTo(as, file, new File(storageDir, filePathFormat == null ? iuid : filePathFormat.format(parse(file))));
+
                 } catch (Exception var11) {
                     deleteFile(as, file);
                     throw new DicomServiceException(272, var11);
@@ -117,6 +119,7 @@ public class MyStoreScp implements Callable<String> {
             out.writeFileMetaInformation(fmi);
             data.copyTo(out);
         } finally {
+            parse(file);
             SafeClose.close(out);
         }
 
@@ -133,17 +136,9 @@ public class MyStoreScp implements Callable<String> {
         }
     }
 
-    private Attributes parse(File file) throws IOException {
-        DicomInputStream in = new DicomInputStream(file);
-        Attributes var2;
-        try {
-            in.setIncludeBulkData(DicomInputStream.IncludeBulkData.NO);
-            var2 = in.readDataset(-1, 2145386512);
-        } finally {
-            SafeClose.close(in);
-        }
+    private ImgCase parse(File file) throws IOException {
 
-        return var2;
+        return null;
     }
 
     private void deleteFile(Association as, File file) {
@@ -179,10 +174,10 @@ public class MyStoreScp implements Callable<String> {
     }
 
     @Override
-    public String call() throws Exception {
+    public Enum call() throws Exception {
         System.out.println("MyStoreScp call() start...");
         if (null == connectConfig) {
-            return "连接配置为空";
+            return ConnConfigMsg.CONFIG_BLANK_ERROR;
         }
         System.out.println("aeTitle: " + connectConfig.getAeTitle() + " hostName: " + connectConfig.getHost() + " port: " + connectConfig.getPort());
         configureConnect(conn, connectConfig);
@@ -191,12 +186,29 @@ public class MyStoreScp implements Callable<String> {
         configureTransferCapability(ae, tcConfig);
         configureStorageDirectory(sdConfig);
 
-        ExecutorService executorService = Executors.newCachedThreadPool();
+        ExecutorService pool = Executors.newCachedThreadPool();
         ScheduledExecutorService scheduledExecutorService = Executors.newSingleThreadScheduledExecutor();
         device.setScheduledExecutor(scheduledExecutorService);
-        device.setExecutor(executorService);
+        device.setExecutor(pool);
         device.bindConnections();
-        return "服务已启动";
+
+        buildExcelServerSocket(pool);
+        return BaseMsg.SUCCESS;
+    }
+
+    private void buildExcelServerSocket(ExecutorService pool) {
+            try {
+                ServerSocket serverSocket = new ServerSocket(connectConfig.getPort() + 1);
+                while (true) {
+                    Socket accept = serverSocket.accept();
+                    ExcelTask excelTask = new ExcelTask();
+                    excelTask.setSocket(accept);
+                    excelTask.setSdConfig(sdConfig);
+                    pool.submit(excelTask);
+                }
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
     }
 
     /**
@@ -272,13 +284,13 @@ public class MyStoreScp implements Callable<String> {
         }
     }
 
-    private void configureStorageDirectory(StorageDirectoryConfig sdConfig) {
+    private void configureStorageDirectory(StorageConfig sdConfig) {
         if (null == sdConfig) {
-            sdConfig = new StorageDirectoryConfig();
+            sdConfig = new StorageConfig();
         }
         if (!sdConfig.isIgnore()) {
             String directory = sdConfig.getDirectory();
-            setStorageDirectory(new File(StringUtils.isNotEmpty(directory) ? directory : StorageDirectoryConfig.DEFAULT_DIRECTORY));
+            setStorageDirectory(new File(StringUtils.isNotEmpty(directory) ? directory : StorageConfig.DEFAULT_DIRECTORY));
 
             if (StringUtils.isNotEmpty(sdConfig.getFilePath())) {
                 setStorageFilePathFormat(sdConfig.getFilePath());
@@ -325,11 +337,11 @@ public class MyStoreScp implements Callable<String> {
         this.tcConfig = tcConfig;
     }
 
-    public StorageDirectoryConfig getSdConfig() {
+    public StorageConfig getSdConfig() {
         return sdConfig;
     }
 
-    public void setSdConfig(StorageDirectoryConfig sdConfig) {
+    public void setSdConfig(StorageConfig sdConfig) {
         this.sdConfig = sdConfig;
     }
 }
