@@ -1,7 +1,7 @@
 package com.tqhy.dcm4che.storescp;
 
 import com.tqhy.dcm4che.storescp.configs.ConnectConfig;
-import com.tqhy.dcm4che.storescp.configs.StorageDirectoryConfig;
+import com.tqhy.dcm4che.storescp.configs.StorageConfig;
 import com.tqhy.dcm4che.storescp.configs.TransferCapabilityConfig;
 import com.tqhy.dcm4che.storescp.enums.msg.ConnConfigMsg;
 import javafx.application.Application;
@@ -17,8 +17,6 @@ import javafx.scene.paint.Color;
 import javafx.scene.text.Text;
 import javafx.stage.DirectoryChooser;
 import javafx.stage.Stage;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.util.concurrent.ExecutionException;
@@ -66,7 +64,6 @@ public class Main extends Application {
      */
     private Text tx_result;
 
-    private static final Logger LOG = LoggerFactory.getLogger(Main.class);
     private Button bt_start;
 
     @Override
@@ -112,15 +109,15 @@ public class Main extends Application {
 
             TransferCapabilityConfig tcConfig = new TransferCapabilityConfig();
             myStoreScp.setTcConfig(tcConfig);
-            StorageDirectoryConfig sdConfig = new StorageDirectoryConfig();
+            StorageConfig sdConfig = new StorageConfig();
             sdConfig.setDirectory(tx_store.getText().trim());
             myStoreScp.setSdConfig(sdConfig);
             ExecutorService executor = Executors.newSingleThreadExecutor();
-            Future<String> task = executor.submit(myStoreScp);
+            Future<Enum> task = executor.submit(myStoreScp);
             try {
-                String s = task.get();
-                tx_result.setText(s);
-                System.out.println(s);
+                Enum msg = task.get();
+                tx_result.setText(msg.name());
+                System.out.println(msg.name());
             } catch (InterruptedException e) {
                 e.printStackTrace();
             } catch (ExecutionException e) {
