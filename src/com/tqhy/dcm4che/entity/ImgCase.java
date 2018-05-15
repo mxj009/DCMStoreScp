@@ -56,12 +56,6 @@ public class ImgCase {
     private String sex;
 
     /**
-     * 影像拍摄位置
-     * (0018,0015)
-     */
-    private String part;
-
-    /**
      * 影像路径
      */
     private String imgUrl;
@@ -145,12 +139,21 @@ public class ImgCase {
         this.sex = sex;
     }
 
-    public String getPart() {
-        return part;
+    @Override
+    public String toString() {
+        return "ImgCase{" +
+                "acquisitionDate='" + acquisitionDate + '\'' +
+                ", patientId='" + patientId + '\'' +
+                ", imgInfo='" + imgInfo + '\'' +
+                ", imgResult='" + imgResult + '\'' +
+                ", age='" + age + '\'' +
+                ", ageNum=" + ageNum +
+                ", name='" + name + '\'' +
+                ", sex='" + sex + '\'' +
+                ", imgUrl='" + imgUrl + '\'' +
+                ", imgThumbUrl='" + imgThumbUrl + '\'' +
+                ", img1024Url='" + img1024Url + '\'' +
+                ", md5='" + md5 + '\'' +
+                '}';
     }
-
-    public void setPart(String part) {
-        this.part = part;
-    }
-
 }
