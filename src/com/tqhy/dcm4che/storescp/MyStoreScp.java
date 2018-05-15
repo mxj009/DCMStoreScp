@@ -1,13 +1,21 @@
 package com.tqhy.dcm4che.storescp;
 
+import com.google.gson.Gson;
 import com.tqhy.dcm4che.storescp.configs.ConnectConfig;
 import com.tqhy.dcm4che.storescp.configs.StorageConfig;
 import com.tqhy.dcm4che.storescp.configs.TransferCapabilityConfig;
-import com.tqhy.dcm4che.storescp.entity.ImgCase;
-import com.tqhy.dcm4che.storescp.enums.msg.BaseMsg;
-import com.tqhy.dcm4che.storescp.enums.msg.ConnConfigMsg;
-import com.tqhy.dcm4che.storescp.excel.ExcelTask;
+import com.tqhy.dcm4che.entity.ImgCase;
+import com.tqhy.dcm4che.msg.BaseMsg;
+import com.tqhy.dcm4che.msg.ConnConfigMsg;
+import com.tqhy.dcm4che.msg.InitScuMsg;
+import com.tqhy.dcm4che.storescp.tasks.BaseTask;
+import com.tqhy.dcm4che.storescp.tasks.ExcelTask;
+import com.tqhy.dcm4che.storescp.tasks.SendScuInitMsgTask;
+import com.tqhy.dcm4che.storescp.tasks.TalkScuTask;
 import com.tqhy.dcm4che.storescp.utils.StringUtils;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.Response;
 import org.dcm4che3.data.Attributes;
 import org.dcm4che3.data.VR;
 import org.dcm4che3.io.DicomOutputStream;
@@ -28,6 +36,7 @@ import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Properties;
 import java.util.ResourceBundle;
 import java.util.concurrent.*;
@@ -39,7 +48,7 @@ import java.util.concurrent.*;
  * @create 2018/5/8
  * @since 1.0.0
  */
-public class MyStoreScp implements Callable<Enum> {
+public class MyStoreScp implements Callable<ConnConfigMsg> {
 
     private static final Logger LOG = LoggerFactory.getLogger(MyStoreScp.class);
     private static ResourceBundle rb = ResourceBundle.getBundle("messages");
@@ -48,6 +57,11 @@ public class MyStoreScp implements Callable<Enum> {
     private final Connection conn;
     private File storageDir;
     private AttributesFormat filePathFormat;
+
+    /**
+     * 初始化客户端source,type,part的message
+     */
+    private InitScuMsg initInfoMsgToScu;
 
     /**
      * 返回给客户端状态码,默认0000H
@@ -95,6 +109,7 @@ public class MyStoreScp implements Callable<Enum> {
             }
         }
     };
+
 
     public MyStoreScp() {
         conn = new Connection();
@@ -174,10 +189,10 @@ public class MyStoreScp implements Callable<Enum> {
     }
 
     @Override
-    public Enum call() throws Exception {
+    public ConnConfigMsg call() throws Exception {
         System.out.println("MyStoreScp call() start...");
         if (null == connectConfig) {
-            return ConnConfigMsg.CONFIG_BLANK_ERROR;
+            return new ConnConfigMsg(ConnConfigMsg.CONFIG_FAIL, ConnConfigMsg.CONFIG_IS_NULL);
         }
         System.out.println("aeTitle: " + connectConfig.getAeTitle() + " hostName: " + connectConfig.getHost() + " port: " + connectConfig.getPort());
         configureConnect(conn, connectConfig);
@@ -186,29 +201,92 @@ public class MyStoreScp implements Callable<Enum> {
         configureTransferCapability(ae, tcConfig);
         configureStorageDirectory(sdConfig);
 
-        ExecutorService pool = Executors.newCachedThreadPool();
-        ScheduledExecutorService scheduledExecutorService = Executors.newSingleThreadScheduledExecutor();
-        device.setScheduledExecutor(scheduledExecutorService);
-        device.setExecutor(pool);
-        device.bindConnections();
+        //访问接口,获取来源,类型,部位数据
+        //initInfoMsgToScu = connectSampleLib();
+        //todo
+        initInfoMsgToScu = new Gson().fromJson("{\"part\":[{\"createTime\":1522222434000,\"delFlag\":1,\"id\":\"2c28c4b79af8445db766515c323a5aff\",\"name\":\"骨肌\",\"updateTime\":1522222434000},{\"createTime\":1503968936000,\"delFlag\":1,\"id\":\"5b571a16d61b42f7a7f5e8b9076605f8\",\"name\":\"口腔\",\"updateTime\":1503968936000},{\"createTime\":1515566629000,\"delFlag\":1,\"id\":\"5bd8be85670d4cfba7f141e9fb050ec9\",\"name\":\"主动脉\",\"updateTime\":1515566629000},{\"createTime\":1499826936000,\"delFlag\":1,\"id\":\"867d657ec68b447ab57f3dff6c3cf576\",\"name\":\"胸部\",\"updateTime\":1499826936000},{\"createTime\":1514343220000,\"delFlag\":1,\"id\":\"9f19e6bc41d148739a2d7b2dda228030\",\"name\":\"曲面\",\"updateTime\":1514343220000},{\"createTime\":1523177588000,\"delFlag\":1,\"id\":\"cab76a4dcc3b4b75977e2b9f59ad9031\",\"name\":\"ISIC\",\"updateTime\":1523177588000},{\"createTime\":1505125602000,\"delFlag\":1,\"id\":\"f530443b1a1947799638b15805f35269\",\"name\":\"床旁\",\"updateTime\":1505125602000}],\"source\":[{\"createTime\":1523177723000,\"delFlag\":1,\"id\":\"3525de9456e54607b5ccf0aad18920ec\",\"name\":\"皮肤病\",\"updateTime\":1523177723000},{\"createTime\":1499824161000,\"delFlag\":1,\"id\":\"3f8b081edd0c4060805bf6a077f30679\",\"name\":\"双桥医院\",\"updateTime\":1499824161000},{\"createTime\":1512365180000,\"delFlag\":1,\"id\":\"43172961c8eb44a1854499576af10db5\",\"name\":\"许玉峰老师\",\"updateTime\":1512365180000},{\"createTime\":1505125718000,\"delFlag\":1,\"id\":\"66ddbafe669245f4b58c2c175f435e94\",\"name\":\"安贞\",\"updateTime\":1505125718000},{\"createTime\":1514342971000,\"delFlag\":1,\"id\":\"8310f5b97fe54a6495688263fa6ca928\",\"name\":\"北大口腔\",\"updateTime\":1514342971000},{\"createTime\":1515551362000,\"delFlag\":1,\"id\":\"87670ceda5ee42299258a9fdf5c361bd\",\"name\":\"数据资料\",\"updateTime\":1515551362000},{\"createTime\":1522378201000,\"delFlag\":1,\"id\":\"c1d0878591104f28b2ca2e6dc4cc5bb9\",\"name\":\"北医骨肌\",\"updateTime\":1522378201000},{\"createTime\":1503969044000,\"delFlag\":1,\"id\":\"dfbee262e15b46d8bc08d1532996bc15\",\"name\":\"其它\",\"updateTime\":1503969044000},{\"createTime\":1500520307000,\"delFlag\":1,\"id\":\"e36fbde330594cd6a8d9e5c66551d12d\",\"name\":\"胡总\",\"updateTime\":1500520307000},{\"createTime\":1515565829000,\"delFlag\":1,\"id\":\"f887334808594a478f65a10925e8e601\",\"name\":\"主动脉窦\",\"updateTime\":1515565829000}],\"type\":[{\"createTime\":1499826937000,\"delFlag\":1,\"id\":\"6c77cb00e3e743bc963ed71f1a2f5082\",\"name\":\"DR\",\"updateTime\":1499826937000},{\"createTime\":1508479424000,\"delFlag\":1,\"id\":\"de38edcc7ff1461ab8d2185ef6d66ad4\",\"name\":\"CT\",\"updateTime\":1508479424000}],\"status\":\"1\",\"desc\":\"查询成功！\"}", InitScuMsg.class);
+        //System.out.println("MyStoreScp connectSampleLib " + initInfoMsgToScu.getPart());
 
-        buildExcelServerSocket(pool);
-        return BaseMsg.SUCCESS;
+        if (null != initInfoMsgToScu) {
+            ExecutorService pool = Executors.newCachedThreadPool();
+            ScheduledExecutorService scheduledExecutorService = Executors.newSingleThreadScheduledExecutor();
+            device.setScheduledExecutor(scheduledExecutorService);
+            device.setExecutor(pool);
+            device.bindConnections();
+
+            buildServerSocket();
+            return new ConnConfigMsg(ConnConfigMsg.CONFIG_SUCCESS);
+        }
+        return new ConnConfigMsg(ConnConfigMsg.CONFIG_SUCCESS, BaseMsg.UNKNOWN_ERROR);
     }
 
-    private void buildExcelServerSocket(ExecutorService pool) {
+    private InitScuMsg connectSampleLib() {
+
+        try {
+            OkHttpClient okHttpClient = new OkHttpClient();
+            Request req = new Request.Builder().url("http://192.168.1.219:8887/api/list").build();
+            Response resp = okHttpClient.newCall(req).execute();
+            if (resp.isSuccessful()) {
+                int code = resp.code();
+                System.out.println("http resp code is: " + code);
+                String message = resp.message();
+                System.out.println("http rsp message is: " + message);
+                if (200 == code) {
+                    String body = resp.body().string();
+                    //System.out.println(body);
+                    InitScuMsg initScuMsg = new Gson().fromJson(body, InitScuMsg.class);
+                    return initScuMsg;
+                }
+                return null;
+            }
+            return null;
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
+    private void buildServerSocket() {
+
+        new Thread(() -> {
             try {
                 ServerSocket serverSocket = new ServerSocket(connectConfig.getPort() + 1);
+                Socket socket = null;
+                ExecutorService pool = Executors.newFixedThreadPool(3);
                 while (true) {
-                    Socket accept = serverSocket.accept();
-                    ExcelTask excelTask = new ExcelTask();
-                    excelTask.setSocket(accept);
-                    excelTask.setSdConfig(sdConfig);
-                    pool.submit(excelTask);
+                    System.out.println("MyStoreScp buildServerSocket() serverSocket..." + serverSocket.getLocalPort());
+                    socket = serverSocket.accept();
+                    System.out.println("MyStoreScp buildServerSocket() accept socket: " + socket);
+                    TalkScuTask talkScuTask = new TalkScuTask();
+                    talkScuTask.setSocket(socket);
+                    Future submit = pool.submit(talkScuTask);
+                    System.out.println("MyStoreScp buildServerSocket() TalkScuTask submit...");
+                    BaseTask task = (BaseTask) submit.get();
+                    int taskType = task.getTaskType();
+                    System.out.println("MystoreScp buildServerSocket taskType is: " + taskType);
+                    switch (taskType) {
+                        case BaseTask.EXCEL_TASK:
+                            ExcelTask excelTask = (ExcelTask) task;
+                            excelTask.setSocket(socket);
+                            excelTask.setSdConfig(sdConfig);
+                            Future<List<ImgCase>> imgListFuture = pool.submit(excelTask);
+                            List<ImgCase> imgCases = imgListFuture.get();
+                            break;
+                        case BaseTask.INIT_MSG_TO_SCU_TASK:
+                            SendScuInitMsgTask sendScuInitMsgTask = (SendScuInitMsgTask) task;
+                            sendScuInitMsgTask.setInitScuMsg(initInfoMsgToScu);
+                            Future scuTaskFuture = pool.submit(sendScuInitMsgTask);
+                            break;
+                    }
                 }
             } catch (IOException e) {
                 e.printStackTrace();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            } catch (ExecutionException e) {
+                e.printStackTrace();
             }
+        }).start();
     }
 
     /**
@@ -280,7 +358,7 @@ public class MyStoreScp implements Callable<Enum> {
 
             String aeTitle = connectConfig.getAeTitle();
             ae.setAETitle(StringUtils.isNotEmpty(aeTitle) ? aeTitle : ConnectConfig.DEFAULT_AE_TITLE);
-            System.out.println("MyStoreScp bingConnect() complete...");
+            System.out.println("MyStoreScp bindConnect() complete...");
         }
     }
 
