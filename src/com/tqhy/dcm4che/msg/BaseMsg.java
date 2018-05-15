@@ -1,21 +1,23 @@
-package com.tqhy.dcm4che.storescp.enums.msg;
+package com.tqhy.dcm4che.msg;
+
+import java.io.Serializable;
 
 /**
  * @author Yiheng
  * @create 2018/5/11
  * @since 1.0.0
  */
-public enum ExcelOperationMsg {
-    SAVE_FAILURE(0,"保存失败"),
-    SAVE_PATH_INVALID(1,"保存路径无效"),
-    PARSE_FAILURE(2,"文件解析失败"),
-    PARSE_SUCCESS(3,"文件解析成功"),
-    SAVE_SUCCESS(4,"保存成功" );
+public class BaseMsg implements Serializable{
+    private static final long serialVersionUID = 1L;
+    protected int status;
+    protected String desc;
+    public static final String UNKNOWN_ERROR = "未知错误";
 
-    private int status;
-    private String desc;
+    public BaseMsg(int status) {
+        this.status = status;
+    }
 
-    ExcelOperationMsg(int status, String desc) {
+    BaseMsg(int status, String desc) {
         this.status =status;
         this.desc = desc;
     }
@@ -38,7 +40,7 @@ public enum ExcelOperationMsg {
 
     @Override
     public String toString() {
-        return "ExcelOperationMsg{" +
+        return "ConnConfigMsg{" +
                 "status=" + status +
                 ", desc='" + desc + '\'' +
                 '}';
