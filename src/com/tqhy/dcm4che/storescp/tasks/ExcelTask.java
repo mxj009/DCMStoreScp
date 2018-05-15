@@ -1,29 +1,34 @@
-package com.tqhy.dcm4che.storescp.excel;
+package com.tqhy.dcm4che.storescp.tasks;
 
 import com.tqhy.dcm4che.storescp.configs.StorageConfig;
-import com.tqhy.dcm4che.storescp.entity.ImgCase;
+import com.tqhy.dcm4che.entity.ImgCase;
 
 import java.io.*;
 import java.net.Socket;
+import java.util.List;
+import java.util.concurrent.Callable;
 
 /**
- *
  * 执行Excel相关操作,包括保存,解析等
  *
  * @author Yiheng
  * @create 2018/5/10
  * @since 1.0.0
  */
-public class ExcelTask implements Runnable {
+public class ExcelTask extends BaseTask implements Callable<List<ImgCase>> {
 
     private StorageConfig sdConfig;
     private Socket socket;
 
     @Override
-    public void run() {
+    public List<ImgCase> call() {
         BufferedOutputStream bos = null;
         BufferedInputStream bis = null;
+        BufferedWriter writer = null;
         try {
+            writer = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()));
+            writer.write("start trans excel");
+            writer.flush();
             System.out.println("excel runnable run...");
             bis = new BufferedInputStream(socket.getInputStream());
             byte[] fnByte = new byte[256];
@@ -31,17 +36,13 @@ public class ExcelTask implements Runnable {
             String fname = new String(fnByte);
             System.out.println("fname is: " + fname);
             File dir = new File(sdConfig.getDirectory());
-            if (dir.exists()) {
-                File file = new File(dir, fname.trim());
-                saveExcel(file, bis, bos);
-            } else if (dir.mkdir()) {
-                File file = new File(dir, fname.trim());
-                saveExcel(file, bis, bos);
-                ImgCase imgCase = parseExcel(file);
-            } else {
-                throw new Exception("存储路径无效");
+            if (!dir.exists()) {
+                dir.mkdir();
             }
-
+            File file = new File(dir, fname.trim());
+            saveExcel(file, bis, bos);
+            List<ImgCase> imgCases = parseExcel(file);
+            return imgCases;
         } catch (IOException e) {
             e.printStackTrace();
         } catch (Exception e) {
@@ -54,9 +55,10 @@ public class ExcelTask implements Runnable {
                 e.printStackTrace();
             }
         }
+        return null;
     }
 
-    private ImgCase parseExcel(File file) {
+    private List<ImgCase> parseExcel(File file) {
         return null;
     }
 
