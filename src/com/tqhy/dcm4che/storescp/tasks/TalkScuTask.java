@@ -15,31 +15,20 @@ import java.util.concurrent.Callable;
  * @create 2018/5/14
  * @since 1.0.0
  */
-public class TalkScuTask implements Callable {
+public class TalkScuTask implements Callable<ScuCommandMsg> {
 
     private Socket socket;
 
     @Override
-    public Callable call() {
+    public ScuCommandMsg call() {
         ObjectInputStream ois = null;
-        ObjectOutputStream oos = null;
         try {
             System.out.println("TalkScuTask start run...");
             ois = new ObjectInputStream(socket.getInputStream());
             ScuCommandMsg scuCommandMsg= (ScuCommandMsg) ois.readObject();
             int command = scuCommandMsg.getCommand();
             System.out.println("TalkScuTask ScuCommandMsg.getCommand()... " + command);
-            switch (command) {
-                case ScuCommandMsg.GET_ALL_INIT_INFO:
-                    SendScuInitMsgTask sendScuInitMsgTask = new SendScuInitMsgTask();
-                    sendScuInitMsgTask.setTaskType(BaseTask.INIT_MSG_TO_SCU_TASK);
-                    sendScuInitMsgTask.setSocket(socket);
-                    return sendScuInitMsgTask;
-                case ScuCommandMsg.TRANSFER_ECXEL:
-                    ExcelTask excelTask = new ExcelTask();
-                    excelTask.setTaskType(BaseTask.EXCEL_TASK);
-                    return excelTask;
-            }
+            return scuCommandMsg;
         } catch (IOException e) {
             e.printStackTrace();
         } catch (ClassNotFoundException e) {
