@@ -1,6 +1,7 @@
 package com.tqhy.dcm4che.storescp;
 
 import com.google.gson.Gson;
+import com.tqhy.dcm4che.msg.ScuCommandMsg;
 import com.tqhy.dcm4che.storescp.configs.ConnectConfig;
 import com.tqhy.dcm4che.storescp.configs.StorageConfig;
 import com.tqhy.dcm4che.storescp.configs.TransferCapabilityConfig;
@@ -8,10 +9,7 @@ import com.tqhy.dcm4che.entity.ImgCase;
 import com.tqhy.dcm4che.msg.BaseMsg;
 import com.tqhy.dcm4che.msg.ConnConfigMsg;
 import com.tqhy.dcm4che.msg.InitScuMsg;
-import com.tqhy.dcm4che.storescp.tasks.BaseTask;
-import com.tqhy.dcm4che.storescp.tasks.ExcelTask;
-import com.tqhy.dcm4che.storescp.tasks.SendScuInitMsgTask;
-import com.tqhy.dcm4che.storescp.tasks.TalkScuTask;
+import com.tqhy.dcm4che.storescp.tasks.*;
 import com.tqhy.dcm4che.storescp.utils.StringUtils;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
@@ -109,6 +107,8 @@ public class MyStoreScp implements Callable<ConnConfigMsg> {
             }
         }
     };
+    private List<ImgCase> imgCasesFromExcel;
+    private ExecutorService pool;
 
 
     public MyStoreScp() {
@@ -151,8 +151,27 @@ public class MyStoreScp implements Callable<ConnConfigMsg> {
         }
     }
 
+    /**
+     * 解析上传后的Dicom文件为ImgCase对象,并与Excel中解析出的ImgCase集合中ImgCase比对,如果PatientID相同,则组装为
+     * 新的ImgCase对象.
+     *
+     * @param file
+     * @return
+     * @throws IOException
+     */
     private ImgCase parse(File file) throws IOException {
-
+        Dcm2ImgCaseTask dcm2ImgCaseTask = new Dcm2ImgCaseTask(file);
+        Future<ImgCase> imgCaseFuture = pool.submit(dcm2ImgCaseTask);
+        try {
+            ImgCase imgCase = imgCaseFuture.get();
+            Future<ImgCase> assembleFuture = pool.submit(new AssembleImgCaseTask(imgCase, imgCasesFromExcel));
+            ImgCase assembledCase = assembleFuture.get();
+            System.out.println("MyStoreScp parse() assembledCase is: "+assembledCase);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        } catch (ExecutionException e) {
+            e.printStackTrace();
+        }
         return null;
     }
 
@@ -208,7 +227,7 @@ public class MyStoreScp implements Callable<ConnConfigMsg> {
         //System.out.println("MyStoreScp connectSampleLib " + initInfoMsgToScu.getPart());
 
         if (null != initInfoMsgToScu) {
-            ExecutorService pool = Executors.newCachedThreadPool();
+            pool = Executors.newCachedThreadPool();
             ScheduledExecutorService scheduledExecutorService = Executors.newSingleThreadScheduledExecutor();
             device.setScheduledExecutor(scheduledExecutorService);
             device.setExecutor(pool);
@@ -252,32 +271,15 @@ public class MyStoreScp implements Callable<ConnConfigMsg> {
             try {
                 ServerSocket serverSocket = new ServerSocket(connectConfig.getPort() + 1);
                 Socket socket = null;
-                ExecutorService pool = Executors.newFixedThreadPool(3);
+                TalkScuTask talkScuTask = null;
+                ExecutorService pool = Executors.newCachedThreadPool();
                 while (true) {
                     System.out.println("MyStoreScp buildServerSocket() serverSocket..." + serverSocket.getLocalPort());
                     socket = serverSocket.accept();
                     System.out.println("MyStoreScp buildServerSocket() accept socket: " + socket);
-                    TalkScuTask talkScuTask = new TalkScuTask();
+                    talkScuTask = new TalkScuTask();
                     talkScuTask.setSocket(socket);
-                    Future submit = pool.submit(talkScuTask);
-                    System.out.println("MyStoreScp buildServerSocket() TalkScuTask submit...");
-                    BaseTask task = (BaseTask) submit.get();
-                    int taskType = task.getTaskType();
-                    System.out.println("MystoreScp buildServerSocket taskType is: " + taskType);
-                    switch (taskType) {
-                        case BaseTask.EXCEL_TASK:
-                            ExcelTask excelTask = (ExcelTask) task;
-                            excelTask.setSocket(socket);
-                            excelTask.setSdConfig(sdConfig);
-                            Future<List<ImgCase>> imgListFuture = pool.submit(excelTask);
-                            List<ImgCase> imgCases = imgListFuture.get();
-                            break;
-                        case BaseTask.INIT_MSG_TO_SCU_TASK:
-                            SendScuInitMsgTask sendScuInitMsgTask = (SendScuInitMsgTask) task;
-                            sendScuInitMsgTask.setInitScuMsg(initInfoMsgToScu);
-                            Future scuTaskFuture = pool.submit(sendScuInitMsgTask);
-                            break;
-                    }
+                    operateTask(talkScuTask, pool);
                 }
             } catch (IOException e) {
                 e.printStackTrace();
@@ -287,6 +289,40 @@ public class MyStoreScp implements Callable<ConnConfigMsg> {
                 e.printStackTrace();
             }
         }).start();
+    }
+
+    private void operateTask(TalkScuTask talkScuTask, ExecutorService pool) throws InterruptedException, ExecutionException {
+        Future submit = pool.submit(talkScuTask);
+        System.out.println("MyStoreScp operateTask TalkScuTask submit...");
+        ScuCommandMsg scuCommandMsg = (ScuCommandMsg) submit.get();
+        int command = scuCommandMsg.getCommand();
+        System.out.println("MystoreScp buildServerSocket command is: " + command);
+        switch (command) {
+            case ScuCommandMsg.TRANSFER_ECXEL_REQUEST:
+                ExcelTask excelTask = new ExcelTask();
+                excelTask.setTaskType(BaseTask.EXCEL_TASK);
+                excelTask.setSocket(talkScuTask.getSocket());
+                excelTask.setSdConfig(sdConfig);
+                Future<List<ImgCase>> imgListFuture = pool.submit(excelTask);
+                //if (imgListFuture.isDone()) {
+                imgCasesFromExcel = imgListFuture.get();
+                System.out.println("MyStoreScp ExcelTask complete...imgCasesFromExcel.size is: " + imgCasesFromExcel.size());
+                operateTask(talkScuTask, pool);
+                //}
+                break;
+            case ScuCommandMsg.GET_ALL_INIT_INFO:
+                SendScuInitMsgTask sendScuInitMsgTask = new SendScuInitMsgTask();
+                sendScuInitMsgTask.setSocket(talkScuTask.getSocket());
+                sendScuInitMsgTask.setInitScuMsg(initInfoMsgToScu);
+                Future scuTaskFuture = pool.submit(sendScuInitMsgTask);
+                //if (scuTaskFuture.isDone()) {
+                BaseMsg msg = (BaseMsg) scuTaskFuture.get();
+                System.out.println("BaseTask.INIT_MSG_TO_SCU_TASK is done...msg status: " + msg.getStatus());
+                operateTask(talkScuTask, pool);
+                //}
+                System.out.println("BaseTask.INIT_MSG_TO_SCU_TASK is done???");
+                break;
+        }
     }
 
     /**
