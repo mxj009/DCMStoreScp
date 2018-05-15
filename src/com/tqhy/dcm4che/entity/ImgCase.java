@@ -1,4 +1,4 @@
-package com.tqhy.dcm4che.storescp.entity;
+package com.tqhy.dcm4che.entity;
 
 /**
  * @author Yiheng
