@@ -3,7 +3,7 @@ package com.tqhy.dcm4che.storescp;
 import com.tqhy.dcm4che.storescp.configs.ConnectConfig;
 import com.tqhy.dcm4che.storescp.configs.StorageConfig;
 import com.tqhy.dcm4che.storescp.configs.TransferCapabilityConfig;
-import com.tqhy.dcm4che.storescp.enums.msg.ConnConfigMsg;
+import com.tqhy.dcm4che.msg.ConnConfigMsg;
 import javafx.application.Application;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -101,7 +101,7 @@ public class Main extends Application {
             String aeAtHostPort = tf_conn.getText().trim();
             ConnConfigMsg configMsg = connConfig.init(aeAtHostPort);
             tx_result.setText(configMsg.getDesc());
-            if (ConnConfigMsg.SUCCESS == configMsg) {
+            if (ConnConfigMsg.CONFIG_SUCCESS == configMsg.getStatus()) {
                 myStoreScp.setConnectConfig(connConfig);
             }else {
                 return;
@@ -113,11 +113,11 @@ public class Main extends Application {
             sdConfig.setDirectory(tx_store.getText().trim());
             myStoreScp.setSdConfig(sdConfig);
             ExecutorService executor = Executors.newSingleThreadExecutor();
-            Future<Enum> task = executor.submit(myStoreScp);
+            Future<ConnConfigMsg> connConfigMsgFuture= executor.submit(myStoreScp);
             try {
-                Enum msg = task.get();
-                tx_result.setText(msg.name());
-                System.out.println(msg.name());
+                ConnConfigMsg msg = connConfigMsgFuture.get();
+                tx_result.setText(msg.getDesc());
+                System.out.println(msg.getDesc());
             } catch (InterruptedException e) {
                 e.printStackTrace();
             } catch (ExecutionException e) {
