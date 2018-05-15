@@ -1,6 +1,6 @@
 package com.tqhy.dcm4che.storescp.configs;
 
-import com.tqhy.dcm4che.storescp.enums.msg.ConnConfigMsg;
+import com.tqhy.dcm4che.msg.ConnConfigMsg;
 import com.tqhy.dcm4che.storescp.utils.StringUtils;
 
 /**
@@ -53,18 +53,18 @@ public class ConnectConfig {
                     return initHostPort(hostPort);
                 }
             }
-            return ConnConfigMsg.SUCCESS;
+            return new ConnConfigMsg(ConnConfigMsg.CONFIG_FAIL,ConnConfigMsg.CONFIG_FORMAT_NOT_RIGHT);
         }
-        return ConnConfigMsg.FAILURE;
+        return new ConnConfigMsg(ConnConfigMsg.CONFIG_FAIL, ConnConfigMsg.CONFIG_IS_NULL);
     }
 
     private ConnConfigMsg initHostPort(String[] hostPort) {
         try {
             this.port = Integer.parseInt(hostPort[1]);
-            return ConnConfigMsg.SUCCESS;
+            return new ConnConfigMsg(ConnConfigMsg.CONFIG_SUCCESS);
         } catch (NumberFormatException e) {
             e.printStackTrace();
-            return ConnConfigMsg.PORT_NOT_NUMBER_ERROR;
+            return new ConnConfigMsg(ConnConfigMsg.CONFIG_FAIL,ConnConfigMsg.PORT_NOT_NUMBER_ERROR);
         }
     }
 
