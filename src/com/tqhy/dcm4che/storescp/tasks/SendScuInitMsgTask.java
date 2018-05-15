@@ -23,14 +23,16 @@ public class SendScuInitMsgTask extends BaseTask implements Callable<BaseMsg> {
     public BaseMsg call() throws Exception {
         ObjectOutputStream oos = null;
         try {
-            System.out.println("SendScuInitMsgTask begin send init info");
+            System.out.println("SendScuInitMsgTask begin send init info...");
             oos = new ObjectOutputStream(socket.getOutputStream());
             oos.writeObject(initScuMsg);
             oos.flush();
+            System.out.println("SendScuInitMsgTask send init info complete...");
+            return new BaseMsg(BaseMsg.SUCCESS);
         } catch (IOException e) {
             e.printStackTrace();
         }
-        return null;
+        return new BaseMsg(BaseMsg.FAILE);
     }
 
     public void setSocket(Socket socket) {
