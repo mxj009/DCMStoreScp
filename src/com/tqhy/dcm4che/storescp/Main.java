@@ -130,7 +130,7 @@ public class Main extends Application {
         tx_result.setFill(Color.RED);
         root.add(tx_result, 1, 8);
 
-        scene = new Scene(root, 450, 300);
+        scene = new Scene(root, 500, 400);
         primaryStage.setTitle("STORESCP");
         primaryStage.setScene(scene);
         primaryStage.show();
