@@ -1,5 +1,8 @@
 package com.tqhy.dcm4che.storescp.tasks;
 
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+
 /**
  * @author Yiheng
  * @create 2018/5/14
@@ -7,15 +10,25 @@ package com.tqhy.dcm4che.storescp.tasks;
  */
 public class BaseTask {
 
-    protected int taskType;
-    public static final int EXCEL_TASK = 1;
-    public static final int INIT_MSG_TO_SCU_TASK = 2;
+    protected ObjectInputStream in = null;
+    protected ObjectOutputStream out = null;
 
-    public int getTaskType() {
-        return taskType;
+    public void setStream(ObjectInputStream in, ObjectOutputStream out) {
+        this.in = in;
+        this.out = out;
     }
 
-    public void setTaskType(int taskType) {
-        this.taskType = taskType;
+    public BaseTask() {
+    }
+
+    public BaseTask(ObjectInputStream in, ObjectOutputStream out) {
+        this.in = in;
+        this.out = out;
+    }
+
+    public void  releaseStream(){
+        this.in = null;
+        this.out = null;
+        System.out.println(getClass().getSimpleName() + " releaseStream...");
     }
 }
