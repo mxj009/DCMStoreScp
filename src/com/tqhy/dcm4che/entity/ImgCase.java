@@ -1,6 +1,11 @@
 package com.tqhy.dcm4che.entity;
 
+import java.util.List;
+import java.util.Objects;
+
 /**
+ * 病例实体类
+ *
  * @author Yiheng
  * @create 2018/5/10
  * @since 1.0.0
@@ -38,12 +43,6 @@ public class ImgCase {
     private String age;
 
     /**
-     * 患者年龄数值,需要换算,tag中直接获取的为出生年月日
-     * (0010,0030)
-     */
-    private double ageNum;
-
-    /**
      * 患者姓名
      * (0010,0010)
      */
@@ -56,24 +55,72 @@ public class ImgCase {
     private String sex;
 
     /**
-     * 影像路径
+     * 批次号
      */
-    private String imgUrl;
+    private String batchNo;
 
     /**
-     * 影像缩略图路径
+     * 影像数量
      */
-    private String imgThumbUrl;
+    private int imgCount;
 
     /**
-     * 1024像素影像路径
+     * 来源
      */
-    private String img1024Url;
+    private String source;
 
     /**
-     * 影像MD5
+     * 类型
      */
-    private String md5;
+    private String type;
+
+    /**
+     * 部位
+     */
+    private String part;
+
+    /**
+     * 病例对应的影像集合
+     */
+    private List<ImgCenter> imgCenters;
+
+    /**
+     * 病例序列号
+     */
+    private int serialNumber;
+
+    public int getSerialNumber() {
+        return serialNumber;
+    }
+
+    public void setSerialNumber(int serialNumber) {
+        this.serialNumber = serialNumber;
+    }
+
+
+    public List<ImgCenter> getImgCenters() {
+        return imgCenters;
+    }
+
+    public void setImgCenters(List<ImgCenter> imgCenters) {
+        this.imgCenters = imgCenters;
+    }
+
+    public String getBatchNo() {
+        return batchNo;
+    }
+
+    public void setBatchNo(String batchNo) {
+        this.batchNo = batchNo;
+    }
+
+    public int getImgCount() {
+        return imgCount;
+    }
+
+    public void setImgCount(int imgCount) {
+        this.imgCount = imgCount;
+    }
 
     public String getAcquisitionDate() {
         return acquisitionDate;
@@ -115,14 +162,6 @@ public class ImgCase {
         this.age = age;
     }
 
-    public double getAgeNum() {
-        return ageNum;
-    }
-
-    public void setAgeNum(double ageNum) {
-        this.ageNum = ageNum;
-    }
-
     public String getName() {
         return name;
     }
@@ -139,6 +178,30 @@ public class ImgCase {
         this.sex = sex;
     }
 
+    public String getSource() {
+        return source;
+    }
+
+    public void setSource(String source) {
+        this.source = source;
+    }
+
+    public String getType() {
+        return type;
+    }
+
+    public void setType(String type) {
+        this.type = type;
+    }
+
+    public String getPart() {
+        return part;
+    }
+
+    public void setPart(String part) {
+        this.part = part;
+    }
+
     @Override
     public String toString() {
         return "ImgCase{" +
@@ -147,13 +210,31 @@ public class ImgCase {
                 ", imgInfo='" + imgInfo + '\'' +
                 ", imgResult='" + imgResult + '\'' +
                 ", age='" + age + '\'' +
-                ", ageNum=" + ageNum +
                 ", name='" + name + '\'' +
                 ", sex='" + sex + '\'' +
-                ", imgUrl='" + imgUrl + '\'' +
-                ", imgThumbUrl='" + imgThumbUrl + '\'' +
-                ", img1024Url='" + img1024Url + '\'' +
-                ", md5='" + md5 + '\'' +
                 '}';
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        ImgCase imgCase = (ImgCase) o;
+        return serialNumber == imgCase.serialNumber &&
+                Objects.equals(acquisitionDate, imgCase.acquisitionDate) &&
+                Objects.equals(patientId, imgCase.patientId) &&
+                Objects.equals(age, imgCase.age) &&
+                Objects.equals(name, imgCase.name) &&
+                Objects.equals(sex, imgCase.sex) &&
+                Objects.equals(batchNo, imgCase.batchNo) &&
+                Objects.equals(source, imgCase.source) &&
+                Objects.equals(type, imgCase.type) &&
+                Objects.equals(part, imgCase.part);
+    }
+
+    @Override
+    public int hashCode() {
+
+        return Objects.hash(acquisitionDate, patientId, imgInfo, imgResult, age, name, sex, batchNo, source, type, part, serialNumber);
     }
 }
