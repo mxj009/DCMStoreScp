@@ -1,23 +1,20 @@
-package com.tqhy.dcm4che.storescp;
+package com.tqhy.dcm4che.storescp.tasks;
 
 import com.google.gson.Gson;
-import com.tqhy.dcm4che.msg.ScuCommandMsg;
+import com.tqhy.dcm4che.entity.AssembledBatch;
+import com.tqhy.dcm4che.entity.ImgCase;
+import com.tqhy.dcm4che.entity.UploadCase;
+import com.tqhy.dcm4che.msg.*;
 import com.tqhy.dcm4che.storescp.configs.ConnectConfig;
 import com.tqhy.dcm4che.storescp.configs.StorageConfig;
 import com.tqhy.dcm4che.storescp.configs.TransferCapabilityConfig;
-import com.tqhy.dcm4che.entity.ImgCase;
-import com.tqhy.dcm4che.msg.BaseMsg;
-import com.tqhy.dcm4che.msg.ConnConfigMsg;
-import com.tqhy.dcm4che.msg.InitScuMsg;
-import com.tqhy.dcm4che.storescp.tasks.*;
 import com.tqhy.dcm4che.storescp.utils.StringUtils;
-import okhttp3.OkHttpClient;
-import okhttp3.Request;
-import okhttp3.Response;
+import okhttp3.*;
 import org.dcm4che3.data.Attributes;
 import org.dcm4che3.data.VR;
 import org.dcm4che3.io.DicomOutputStream;
 import org.dcm4che3.net.*;
+import org.dcm4che3.net.Connection;
 import org.dcm4che3.net.pdu.PresentationContext;
 import org.dcm4che3.net.service.BasicCEchoSCP;
 import org.dcm4che3.net.service.BasicCStoreSCP;
@@ -31,8 +28,6 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
-import java.net.ServerSocket;
-import java.net.Socket;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Properties;
@@ -46,20 +41,15 @@ import java.util.concurrent.*;
  * @create 2018/5/8
  * @since 1.0.0
  */
-public class MyStoreScp implements Callable<ConnConfigMsg> {
+public class StoreScpTask extends BaseTask {
 
-    private static final Logger LOG = LoggerFactory.getLogger(MyStoreScp.class);
+    private static final Logger LOG = LoggerFactory.getLogger(StoreScpTask.class);
     private static ResourceBundle rb = ResourceBundle.getBundle("messages");
     private final Device device;
     private final ApplicationEntity ae;
     private final Connection conn;
     private File storageDir;
     private AttributesFormat filePathFormat;
-
-    /**
-     * 初始化客户端source,type,part的message
-     */
-    private InitScuMsg initInfoMsgToScu;
 
     /**
      * 返回给客户端状态码,默认0000H
@@ -81,25 +71,44 @@ public class MyStoreScp implements Callable<ConnConfigMsg> {
      */
     private StorageConfig sdConfig;
 
+    /**
+     * Excel解析出来的UploadCase集合
+     */
+    private List<ImgCase> imgCasesFromExcel;
+
+    /**
+     * 客户端上传批次信息,包括批次,来源,部位,类型
+     */
+    private AssembledBatch assembledBatch;
+
+    /**
+     * 上传到样本库病例
+     */
+    private UploadCase uploadCase;
+
+    /**
+     * 本次上传dicom文件数量
+     */
+    private int dicomFileCount;
+
+    /**
+     * 已经处理完的dicom文件数量
+     */
+    private int parsedFileCount;
+
     private final BasicCStoreSCP cstoreSCP = new BasicCStoreSCP(new String[]{"*"}) {
         protected void store(Association as, PresentationContext pc, Attributes rq, PDVInputStream data, Attributes rsp) throws IOException {
             rsp.setInt(2304, VR.US, new int[]{status});
-            System.out.println("MyStoreScp store() start..");
+            System.out.println("StoreScpTask store() start..");
             if (storageDir != null) {
                 String cuid = rq.getString(2);
                 String iuid = rq.getString(4096);
                 String tsuid = pc.getTransferSyntax();
-                /*System.out.println("#############################################################");
-                System.out.println("MyStore store rq.toString(): " + rq.toString());
-                System.out.println("MyStore store rsp.toString(): " + rsp.toString());
-                System.out.println("#############################################################");*/
                 File file = new File(storageDir, iuid + ".part");
 
                 try {
                     storeTo(as, as.createFileMetaInformation(iuid, cuid, tsuid), data, file);
                     System.out.println("MyStore store complete..." + file.getAbsolutePath());
-                    //renameTo(as, file, new File(storageDir, filePathFormat == null ? iuid : filePathFormat.format(parse(file))));
-
                 } catch (Exception var11) {
                     deleteFile(as, file);
                     throw new DicomServiceException(272, var11);
@@ -107,11 +116,9 @@ public class MyStoreScp implements Callable<ConnConfigMsg> {
             }
         }
     };
-    private List<ImgCase> imgCasesFromExcel;
-    private ExecutorService pool;
 
 
-    public MyStoreScp() {
+    public StoreScpTask() {
         conn = new Connection();
 
         ae = new ApplicationEntity("*");
@@ -126,7 +133,6 @@ public class MyStoreScp implements Callable<ConnConfigMsg> {
     }
 
     private void storeTo(Association as, Attributes fmi, PDVInputStream data, File file) throws IOException {
-        LOG.info("{}: M-WRITE {}", as, file);
         file.getParentFile().mkdirs();
         DicomOutputStream out = new DicomOutputStream(file);
 
@@ -140,39 +146,56 @@ public class MyStoreScp implements Callable<ConnConfigMsg> {
 
     }
 
-    private void renameTo(Association as, File from, File dest) throws IOException {
-        LOG.info("{}: M-RENAME {} to {}", new Object[]{as, from, dest});
-        if (!dest.getParentFile().mkdirs()) {
-            dest.delete();
-        }
-
-        if (!from.renameTo(dest)) {
-            throw new IOException("Failed to rename " + from + " to " + dest);
-        }
-    }
-
     /**
-     * 解析上传后的Dicom文件为ImgCase对象,并与Excel中解析出的ImgCase集合中ImgCase比对,如果PatientID相同,则组装为
-     * 新的ImgCase对象.
+     * 解析上传后的Dicom文件为UploadCase对象,并与Excel中解析出的UploadCase集合中UploadCase比对,如果PatientID相同,则组装为
+     * 新的UploadCase对象.
      *
      * @param file
      * @return
      * @throws IOException
      */
-    private ImgCase parse(File file) throws IOException {
-        Dcm2ImgCaseTask dcm2ImgCaseTask = new Dcm2ImgCaseTask(file);
-        Future<ImgCase> imgCaseFuture = pool.submit(dcm2ImgCaseTask);
+    private void parse(File file) {
+        AddDcm2UploadCaseTask addDcm2UploadCaseTask = new AddDcm2UploadCaseTask(file, uploadCase, assembledBatch);
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+        Future<UploadCase> uploadCaseFuture = executor.submit(addDcm2UploadCaseTask);
         try {
-            ImgCase imgCase = imgCaseFuture.get();
-            Future<ImgCase> assembleFuture = pool.submit(new AssembleImgCaseTask(imgCase, imgCasesFromExcel));
-            ImgCase assembledCase = assembleFuture.get();
-            System.out.println("MyStoreScp parse() assembledCase is: "+assembledCase);
+            uploadCase = uploadCaseFuture.get();
+            System.out.println("StoreScpTask parse() uploadCase is: " + uploadCase);
+            parsedFileCount++;
+            if (parsedFileCount == dicomFileCount) {
+                //已经处理完毕所有上传文件
+                upLoadCases(uploadCase);
+                parsedFileCount = 0;
+            }
         } catch (InterruptedException e) {
             e.printStackTrace();
         } catch (ExecutionException e) {
             e.printStackTrace();
         }
-        return null;
+    }
+
+    /**
+     * 上传本次解析完毕所有病例
+     *
+     * @param uploadCase
+     */
+    private void upLoadCases(UploadCase uploadCase) {
+        OkHttpClient okHttpClient = new OkHttpClient();
+        MediaType JSON = MediaType.parse("application/json; charset=utf-8");
+        String json = new Gson().toJson(uploadCase);
+        RequestBody requestBody = RequestBody.create(JSON, json);
+        Request request = new Request.Builder()
+                .url("http://192.168.1.219/api/dicom")
+                .post(requestBody)
+                .build();
+        try {
+            Response response = okHttpClient.newCall(request).execute();
+            if (response.isSuccessful()) {
+                System.out.println(getClass().getSimpleName() + " upLoadCases() " + response.body().string());
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     private void deleteFile(Association as, File file) {
@@ -181,7 +204,6 @@ public class MyStoreScp implements Callable<ConnConfigMsg> {
         } else {
             LOG.warn("{}: M-DELETE {} failed!", as, file);
         }
-
     }
 
     private DicomServiceRegistry createServiceRegistry() {
@@ -195,7 +217,6 @@ public class MyStoreScp implements Callable<ConnConfigMsg> {
         if (storageDir != null) {
             storageDir.mkdirs();
         }
-
         this.storageDir = storageDir;
     }
 
@@ -207,122 +228,39 @@ public class MyStoreScp implements Callable<ConnConfigMsg> {
         this.status = status;
     }
 
-    @Override
-    public ConnConfigMsg call() throws Exception {
-        System.out.println("MyStoreScp call() start...");
-        if (null == connectConfig) {
-            return new ConnConfigMsg(ConnConfigMsg.CONFIG_FAIL, ConnConfigMsg.CONFIG_IS_NULL);
-        }
-        System.out.println("aeTitle: " + connectConfig.getAeTitle() + " hostName: " + connectConfig.getHost() + " port: " + connectConfig.getPort());
+    public ConnConfigMsg call() {
+        System.out.println(getClass().getSimpleName() + " call() start...");
+        System.out.println(getClass().getSimpleName() + " aeTitle: " + connectConfig.getAeTitle() + " hostName: " + connectConfig.getHost() + " port: " + connectConfig.getPort());
         configureConnect(conn, connectConfig);
-        bindConnect(conn, ae, connectConfig);
-        //main.setStatus(CLIUtils.getIntOption(cl, "status", 0));
-        configureTransferCapability(ae, tcConfig);
-        configureStorageDirectory(sdConfig);
-
-        //访问接口,获取来源,类型,部位数据
-        //initInfoMsgToScu = connectSampleLib();
-        //todo
-        initInfoMsgToScu = new Gson().fromJson("{\"part\":[{\"createTime\":1522222434000,\"delFlag\":1,\"id\":\"2c28c4b79af8445db766515c323a5aff\",\"name\":\"骨肌\",\"updateTime\":1522222434000},{\"createTime\":1503968936000,\"delFlag\":1,\"id\":\"5b571a16d61b42f7a7f5e8b9076605f8\",\"name\":\"口腔\",\"updateTime\":1503968936000},{\"createTime\":1515566629000,\"delFlag\":1,\"id\":\"5bd8be85670d4cfba7f141e9fb050ec9\",\"name\":\"主动脉\",\"updateTime\":1515566629000},{\"createTime\":1499826936000,\"delFlag\":1,\"id\":\"867d657ec68b447ab57f3dff6c3cf576\",\"name\":\"胸部\",\"updateTime\":1499826936000},{\"createTime\":1514343220000,\"delFlag\":1,\"id\":\"9f19e6bc41d148739a2d7b2dda228030\",\"name\":\"曲面\",\"updateTime\":1514343220000},{\"createTime\":1523177588000,\"delFlag\":1,\"id\":\"cab76a4dcc3b4b75977e2b9f59ad9031\",\"name\":\"ISIC\",\"updateTime\":1523177588000},{\"createTime\":1505125602000,\"delFlag\":1,\"id\":\"f530443b1a1947799638b15805f35269\",\"name\":\"床旁\",\"updateTime\":1505125602000}],\"source\":[{\"createTime\":1523177723000,\"delFlag\":1,\"id\":\"3525de9456e54607b5ccf0aad18920ec\",\"name\":\"皮肤病\",\"updateTime\":1523177723000},{\"createTime\":1499824161000,\"delFlag\":1,\"id\":\"3f8b081edd0c4060805bf6a077f30679\",\"name\":\"双桥医院\",\"updateTime\":1499824161000},{\"createTime\":1512365180000,\"delFlag\":1,\"id\":\"43172961c8eb44a1854499576af10db5\",\"name\":\"许玉峰老师\",\"updateTime\":1512365180000},{\"createTime\":1505125718000,\"delFlag\":1,\"id\":\"66ddbafe669245f4b58c2c175f435e94\",\"name\":\"安贞\",\"updateTime\":1505125718000},{\"createTime\":1514342971000,\"delFlag\":1,\"id\":\"8310f5b97fe54a6495688263fa6ca928\",\"name\":\"北大口腔\",\"updateTime\":1514342971000},{\"createTime\":1515551362000,\"delFlag\":1,\"id\":\"87670ceda5ee42299258a9fdf5c361bd\",\"name\":\"数据资料\",\"updateTime\":1515551362000},{\"createTime\":1522378201000,\"delFlag\":1,\"id\":\"c1d0878591104f28b2ca2e6dc4cc5bb9\",\"name\":\"北医骨肌\",\"updateTime\":1522378201000},{\"createTime\":1503969044000,\"delFlag\":1,\"id\":\"dfbee262e15b46d8bc08d1532996bc15\",\"name\":\"其它\",\"updateTime\":1503969044000},{\"createTime\":1500520307000,\"delFlag\":1,\"id\":\"e36fbde330594cd6a8d9e5c66551d12d\",\"name\":\"胡总\",\"updateTime\":1500520307000},{\"createTime\":1515565829000,\"delFlag\":1,\"id\":\"f887334808594a478f65a10925e8e601\",\"name\":\"主动脉窦\",\"updateTime\":1515565829000}],\"type\":[{\"createTime\":1499826937000,\"delFlag\":1,\"id\":\"6c77cb00e3e743bc963ed71f1a2f5082\",\"name\":\"DR\",\"updateTime\":1499826937000},{\"createTime\":1508479424000,\"delFlag\":1,\"id\":\"de38edcc7ff1461ab8d2185ef6d66ad4\",\"name\":\"CT\",\"updateTime\":1508479424000}],\"status\":\"1\",\"desc\":\"查询成功！\"}", InitScuMsg.class);
-        //System.out.println("MyStoreScp connectSampleLib " + initInfoMsgToScu.getPart());
-
-        if (null != initInfoMsgToScu) {
-            pool = Executors.newCachedThreadPool();
+        try {
+            bindConnect(conn, ae, connectConfig);
+            configureTransferCapability(ae, tcConfig);
+            configureStorageDirectory(sdConfig);
+            ExecutorService pool = Executors.newCachedThreadPool();
             ScheduledExecutorService scheduledExecutorService = Executors.newSingleThreadScheduledExecutor();
             device.setScheduledExecutor(scheduledExecutorService);
             device.setExecutor(pool);
             device.bindConnections();
-
-            buildServerSocket();
-            return new ConnConfigMsg(ConnConfigMsg.CONFIG_SUCCESS);
+        } catch (Exception e) {
+            e.printStackTrace();
         }
-        return new ConnConfigMsg(ConnConfigMsg.CONFIG_SUCCESS, BaseMsg.UNKNOWN_ERROR);
-    }
-
-    private InitScuMsg connectSampleLib() {
 
         try {
-            OkHttpClient okHttpClient = new OkHttpClient();
-            Request req = new Request.Builder().url("http://192.168.1.219:8887/api/list").build();
-            Response resp = okHttpClient.newCall(req).execute();
-            if (resp.isSuccessful()) {
-                int code = resp.code();
-                System.out.println("http resp code is: " + code);
-                String message = resp.message();
-                System.out.println("http rsp message is: " + message);
-                if (200 == code) {
-                    String body = resp.body().string();
-                    //System.out.println(body);
-                    InitScuMsg initScuMsg = new Gson().fromJson(body, InitScuMsg.class);
-                    return initScuMsg;
-                }
-                return null;
-            }
-            return null;
+            ScuCommandMsg transDicomReadymsg = new ScuCommandMsg(1);
+            transDicomReadymsg.setCommand(ScuCommandMsg.TRANSFER_DICOM_READY);
+            out.writeObject(transDicomReadymsg);
+            out.flush();
+            System.out.println(getClass().getSimpleName() + " write ScuCommandMsg.TRANSFER_DICOM_READY...");
+            UpLoadInfoMsg upLoadInfoMsg = (UpLoadInfoMsg) in.readObject();
+            dicomFileCount = upLoadInfoMsg.getDicomFileCount();
+            System.out.println(getClass().getSimpleName() + " read UpLoadInfoMsg dicomFileCount is ..." + dicomFileCount);
+            parsedFileCount = 0;
         } catch (IOException e) {
+            e.printStackTrace();
+        } catch (ClassNotFoundException e) {
             e.printStackTrace();
         }
         return null;
-    }
-
-    private void buildServerSocket() {
-
-        new Thread(() -> {
-            try {
-                ServerSocket serverSocket = new ServerSocket(connectConfig.getPort() + 1);
-                Socket socket = null;
-                TalkScuTask talkScuTask = null;
-                ExecutorService pool = Executors.newCachedThreadPool();
-                while (true) {
-                    System.out.println("MyStoreScp buildServerSocket() serverSocket..." + serverSocket.getLocalPort());
-                    socket = serverSocket.accept();
-                    System.out.println("MyStoreScp buildServerSocket() accept socket: " + socket);
-                    talkScuTask = new TalkScuTask();
-                    talkScuTask.setSocket(socket);
-                    operateTask(talkScuTask, pool);
-                }
-            } catch (IOException e) {
-                e.printStackTrace();
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            } catch (ExecutionException e) {
-                e.printStackTrace();
-            }
-        }).start();
-    }
-
-    private void operateTask(TalkScuTask talkScuTask, ExecutorService pool) throws InterruptedException, ExecutionException {
-        Future submit = pool.submit(talkScuTask);
-        System.out.println("MyStoreScp operateTask TalkScuTask submit...");
-        ScuCommandMsg scuCommandMsg = (ScuCommandMsg) submit.get();
-        int command = scuCommandMsg.getCommand();
-        System.out.println("MystoreScp buildServerSocket command is: " + command);
-        switch (command) {
-            case ScuCommandMsg.TRANSFER_ECXEL_REQUEST:
-                ExcelTask excelTask = new ExcelTask();
-                excelTask.setTaskType(BaseTask.EXCEL_TASK);
-                excelTask.setSocket(talkScuTask.getSocket());
-                excelTask.setSdConfig(sdConfig);
-                Future<List<ImgCase>> imgListFuture = pool.submit(excelTask);
-                //if (imgListFuture.isDone()) {
-                imgCasesFromExcel = imgListFuture.get();
-                System.out.println("MyStoreScp ExcelTask complete...imgCasesFromExcel.size is: " + imgCasesFromExcel.size());
-                operateTask(talkScuTask, pool);
-                //}
-                break;
-            case ScuCommandMsg.GET_ALL_INIT_INFO:
-                SendScuInitMsgTask sendScuInitMsgTask = new SendScuInitMsgTask();
-                sendScuInitMsgTask.setSocket(talkScuTask.getSocket());
-                sendScuInitMsgTask.setInitScuMsg(initInfoMsgToScu);
-                Future scuTaskFuture = pool.submit(sendScuInitMsgTask);
-                //if (scuTaskFuture.isDone()) {
-                BaseMsg msg = (BaseMsg) scuTaskFuture.get();
-                System.out.println("BaseTask.INIT_MSG_TO_SCU_TASK is done...msg status: " + msg.getStatus());
-                operateTask(talkScuTask, pool);
-                //}
-                System.out.println("BaseTask.INIT_MSG_TO_SCU_TASK is done???");
-                break;
-        }
     }
 
     /**
@@ -394,7 +332,7 @@ public class MyStoreScp implements Callable<ConnConfigMsg> {
 
             String aeTitle = connectConfig.getAeTitle();
             ae.setAETitle(StringUtils.isNotEmpty(aeTitle) ? aeTitle : ConnectConfig.DEFAULT_AE_TITLE);
-            System.out.println("MyStoreScp bindConnect() complete...");
+            System.out.println("StoreScpTask bindConnect() complete...");
         }
     }
 
@@ -457,5 +395,21 @@ public class MyStoreScp implements Callable<ConnConfigMsg> {
 
     public void setSdConfig(StorageConfig sdConfig) {
         this.sdConfig = sdConfig;
+    }
+
+    public UploadCase getUploadCase() {
+        return uploadCase;
+    }
+
+    public void setUploadCase(UploadCase uploadCase) {
+        this.uploadCase = uploadCase;
+    }
+
+    public AssembledBatch getAssembledBatch() {
+        return assembledBatch;
+    }
+
+    public void setAssembledBatch(AssembledBatch assembledBatch) {
+        this.assembledBatch = assembledBatch;
     }
 }
