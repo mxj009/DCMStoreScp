@@ -11,23 +11,23 @@ import java.io.Serializable;
  */
 public class Batch implements Serializable{
     private static final long serialVersionUID =1L;
-    private String id;
+    private String batchNo;
     private String desc;
 
     public Batch() {
     }
 
-    public Batch(String id, String desc) {
-        this.id = id;
+    public Batch(String batchNo, String desc) {
+        this.batchNo = batchNo;
         this.desc = desc;
     }
 
-    public String getId() {
-        return id;
+    public String getBatchNo() {
+        return batchNo;
     }
 
-    public void setId(String id) {
-        this.id = id;
+    public void setBatchNo(String batchNo) {
+        this.batchNo = batchNo;
     }
 
     public String getDesc() {
@@ -36,5 +36,13 @@ public class Batch implements Serializable{
 
     public void setDesc(String desc) {
         this.desc = desc;
+    }
+
+    @Override
+    public String toString() {
+        return "Batch{" +
+                "batchNo='" + batchNo + '\'' +
+                ", desc='" + desc + '\'' +
+                '}';
     }
 }
