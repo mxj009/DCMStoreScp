@@ -1,9 +1,11 @@
 package com.tqhy.dcm4che.storescp;
 
+import com.tqhy.dcm4che.msg.ConnConfigMsg;
 import com.tqhy.dcm4che.storescp.configs.ConnectConfig;
 import com.tqhy.dcm4che.storescp.configs.StorageConfig;
 import com.tqhy.dcm4che.storescp.configs.TransferCapabilityConfig;
-import com.tqhy.dcm4che.msg.ConnConfigMsg;
+import com.tqhy.dcm4che.storescp.tasks.SCPTask;
+import com.tqhy.dcm4che.storescp.tasks.StoreScpTask;
 import javafx.application.Application;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -19,10 +21,11 @@ import javafx.stage.DirectoryChooser;
 import javafx.stage.Stage;
 
 import java.io.File;
-import java.util.concurrent.ExecutionException;
+import java.io.IOException;
+import java.net.ServerSocket;
+import java.net.Socket;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 
 /**
  * 文件上传服务端界面入口
@@ -96,33 +99,17 @@ public class Main extends Application {
 
         bt_start = new Button("开启服务");
         bt_start.setOnAction(event -> {
-            MyStoreScp myStoreScp = new MyStoreScp();
             ConnectConfig connConfig = new ConnectConfig();
             String aeAtHostPort = tf_conn.getText().trim();
             ConnConfigMsg configMsg = connConfig.init(aeAtHostPort);
             tx_result.setText(configMsg.getDesc());
             if (ConnConfigMsg.CONFIG_SUCCESS == configMsg.getStatus()) {
-                myStoreScp.setConnectConfig(connConfig);
-            }else {
+                buildServerSocket(connConfig);
+            } else {
                 return;
             }
 
-            TransferCapabilityConfig tcConfig = new TransferCapabilityConfig();
-            myStoreScp.setTcConfig(tcConfig);
-            StorageConfig sdConfig = new StorageConfig();
-            sdConfig.setDirectory(tx_store.getText().trim());
-            myStoreScp.setSdConfig(sdConfig);
-            ExecutorService executor = Executors.newSingleThreadExecutor();
-            Future<ConnConfigMsg> connConfigMsgFuture= executor.submit(myStoreScp);
-            try {
-                ConnConfigMsg msg = connConfigMsgFuture.get();
-                tx_result.setText(msg.getDesc());
-                System.out.println(msg.getDesc());
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            } catch (ExecutionException e) {
-                e.printStackTrace();
-            }
+
         });
         root.add(bt_start, 0, 8);
 
@@ -136,6 +123,34 @@ public class Main extends Application {
         primaryStage.show();
     }
 
+    private void buildServerSocket(ConnectConfig connConfig) {
+
+        new Thread(() -> {
+            try {
+                ServerSocket serverSocket = new ServerSocket(connConfig.getPort() + 1);
+                Socket socket = null;
+                StoreScpTask storeScpTask = null;
+                ExecutorService pool = Executors.newCachedThreadPool();
+                while (true) {
+                    System.out.println("StoreScpTask buildServerSocket() serverSocket..." + serverSocket.getLocalPort());
+                    socket = serverSocket.accept();
+                    System.out.println("StoreScpTask buildServerSocket() accept socket: " + socket);
+
+                    storeScpTask = new StoreScpTask();
+                    storeScpTask.setConnectConfig(connConfig);
+                    TransferCapabilityConfig tcConfig = new TransferCapabilityConfig();
+                    storeScpTask.setTcConfig(tcConfig);
+                    StorageConfig sdConfig = new StorageConfig();
+                    sdConfig.setDirectory(tx_store.getText().trim());
+                    storeScpTask.setSdConfig(sdConfig);
+                    SCPTask scpTask = new SCPTask(socket, storeScpTask);
+                    pool.submit(scpTask);
+                }
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }).start();
+    }
 
     public static void main(String[] args) {
         launch(args);
