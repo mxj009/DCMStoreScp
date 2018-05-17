@@ -2,11 +2,10 @@ package com.tqhy.dcm4che.storescp.tasks;
 
 import com.tqhy.dcm4che.msg.ScuCommandMsg;
 
+import java.io.EOFException;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
-import java.net.Socket;
-import java.util.concurrent.Callable;
 
 /**
  * 和客户端会话任务
@@ -15,33 +14,27 @@ import java.util.concurrent.Callable;
  * @create 2018/5/14
  * @since 1.0.0
  */
-public class TalkScuTask implements Callable<ScuCommandMsg> {
+public class TalkScuTask extends BaseTask {
 
-    private Socket socket;
-
-    @Override
     public ScuCommandMsg call() {
         ObjectInputStream ois = null;
+        ObjectOutputStream oos = null;
         try {
-            System.out.println("TalkScuTask start run...");
-            ois = new ObjectInputStream(socket.getInputStream());
-            ScuCommandMsg scuCommandMsg= (ScuCommandMsg) ois.readObject();
+            ois = in;
+            oos = out;
+            ScuCommandMsg scuCommandMsg = (ScuCommandMsg) ois.readObject();
             int command = scuCommandMsg.getCommand();
             System.out.println("TalkScuTask ScuCommandMsg.getCommand()... " + command);
             return scuCommandMsg;
+        } catch (EOFException e) {
+            e.printStackTrace();
         } catch (IOException e) {
             e.printStackTrace();
         } catch (ClassNotFoundException e) {
             e.printStackTrace();
+        } finally {
+            releaseStream();
         }
-        return null;
-    }
-
-    public Socket getSocket() {
-        return socket;
-    }
-
-    public void setSocket(Socket socket) {
-        this.socket = socket;
+        return new ScuCommandMsg(1);
     }
 }
