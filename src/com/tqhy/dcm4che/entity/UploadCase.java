@@ -10,26 +10,26 @@ import java.util.List;
  * @create 2018/5/15
  * @since 1.0.0
  */
-public class AssembledImgCases implements Serializable{
+public class UploadCase implements Serializable{
     private static final long serialVersionUID = 1L;
 
-    private List<ImgCase> imgCases;
+    private List<ImgCase> data;
     private Batch batch;
 
-    public AssembledImgCases() {
+    public UploadCase() {
     }
 
-    public AssembledImgCases(List<ImgCase> imgCases, Batch batch) {
-        this.imgCases = imgCases;
+    public UploadCase(List<ImgCase> data, Batch batch) {
+        this.data = data;
         this.batch = batch;
     }
 
-    public List<ImgCase> getImgCases() {
-        return imgCases;
+    public List<ImgCase> getData() {
+        return data;
     }
 
-    public void setImgCases(List<ImgCase> imgCases) {
-        this.imgCases = imgCases;
+    public void setData(List<ImgCase> data) {
+        this.data = data;
     }
 
     public Batch getBatch() {
