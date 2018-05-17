@@ -2,7 +2,10 @@ package com.tqhy.dcm4che.storescp.tasks;
 
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
+import com.tqhy.dcm4che.entity.AssembledBatch;
 import com.tqhy.dcm4che.entity.ImgCase;
+import com.tqhy.dcm4che.entity.ImgCenter;
+import com.tqhy.dcm4che.entity.UploadCase;
 import com.tqhy.dcm4che.storescp.constant.DicomTag;
 import com.tqhy.dcm4che.storescp.utils.StringUtils;
 import org.dcm4che3.io.DicomInputStream;
@@ -22,17 +25,47 @@ import java.util.concurrent.Callable;
  * @create 2018/5/15
  * @since 1.0.0
  */
-public class Dcm2ImgCaseTask extends BaseTask implements Callable<ImgCase> {
+public class AddDcm2UploadCaseTask extends BaseTask implements Callable<UploadCase> {
 
+    private AssembledBatch assembledBatch;
     private File dcmFile;
+    private UploadCase uploadCase;
 
     @Override
-    public ImgCase call() throws Exception {
+    public UploadCase call() throws Exception {
         try {
             File jsonFile = dicom2Json(dcmFile);
-            ImgCase imgCase = Json2Object(jsonFile);
-            System.out.println(imgCase);
-            return imgCase;
+            ImgCase newCase = Json2Object(jsonFile);
+            System.out.println(getClass().getSimpleName() + " newCase: " + newCase);
+
+            if (null == uploadCase) {
+                uploadCase = new UploadCase();
+                uploadCase.getData().add(newCase);
+                return uploadCase;
+            }
+
+            List<ImgCase> imgCases = uploadCase.getData();
+            System.out.println(getClass().getSimpleName() + " call() uploadCase.getData(): " + imgCases.size());
+            ImgCase aCase = null;
+            boolean add = false;
+            for (int i = 0; i < imgCases.size(); i++) {
+                aCase = imgCases.get(i);
+                if (aCase.equals(newCase)) {
+                    aCase.setImgCount(aCase.getImgCount() + 1);
+                    List<ImgCenter> newCaseImgCenters = newCase.getImgCenters();
+                    aCase.getImgCenters().addAll(newCaseImgCenters);
+                    break;
+                } else {
+                    if (i == (imgCases.size() - 1)) {
+                        add = true;
+                    }
+                }
+            }
+            if (add) {
+                imgCases.add(newCase);
+            }
+            uploadCase.setData(imgCases);
+            return uploadCase;
         } catch (FileNotFoundException e) {
             e.printStackTrace();
         }
@@ -45,7 +78,7 @@ public class Dcm2ImgCaseTask extends BaseTask implements Callable<ImgCase> {
             dis.setIncludeBulkData(DicomInputStream.IncludeBulkData.NO);
             Map<String, ?> conf = new HashMap(2);
             String jsonFilePath = dcmFile.getAbsolutePath() + ".json";
-            System.out.println("Dcm2ImgCaseTask dicom2Json jsonFilePath is: "+jsonFilePath);
+            System.out.println("AddDcm2UploadCaseTask dicom2Json jsonFilePath is: " + jsonFilePath);
             File jsonFile = new File(jsonFilePath);
             jsonFile.createNewFile();
             JsonGenerator jsonGen = Json.createGeneratorFactory(conf)
@@ -71,7 +104,7 @@ public class Dcm2ImgCaseTask extends BaseTask implements Callable<ImgCase> {
         a:
         for (Map.Entry<String, Map<String, Object>> entry : fromJson.entrySet()) {
             String key = entry.getKey();
-            System.out.println("key is: " + key);
+            System.out.println("Json2Object key is: " + key);
 
             switch (key) {
                 case DicomTag.ACQUISITION_DATE:
@@ -91,17 +124,20 @@ public class Dcm2ImgCaseTask extends BaseTask implements Callable<ImgCase> {
                     String name = split[1].replace('}', ' ').trim();
                     imgCase.setName(name);
                     break;
-                case DicomTag.AGE_NUM:
-                    String birthDate = getValue(entry);
-                    System.out.println(birthDate);
-                    imgCase.setAgeNum(0);
-                    break;
                 case DicomTag.AGE:
                     String age = getValue(entry);
                     imgCase.setAge(age);
                     break a;
+                case DicomTag.SERIAL_NUMBER:
+                    String serialNumber = getValue(entry);
+                    imgCase.setSerialNumber(Integer.parseInt(serialNumber));
             }
         }
+        imgCase.setImgCount(1);
+        imgCase.setBatchNo(assembledBatch.getBatch().getBatchNo());
+        imgCase.setSource(assembledBatch.getSource());
+        imgCase.setType(assembledBatch.getType());
+        imgCase.setPart(assembledBatch.getPart());
         return imgCase;
     }
 
@@ -112,7 +148,9 @@ public class Dcm2ImgCaseTask extends BaseTask implements Callable<ImgCase> {
         return value;
     }
 
-    public Dcm2ImgCaseTask(File dcmFile) {
+    public AddDcm2UploadCaseTask(File dcmFile, UploadCase uploadCase, AssembledBatch assembledBatch) {
         this.dcmFile = dcmFile;
+        this.uploadCase = uploadCase;
+        this.assembledBatch = assembledBatch;
     }
 }
