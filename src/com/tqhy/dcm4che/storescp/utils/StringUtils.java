@@ -16,6 +16,13 @@ public class StringUtils {
         return str != null && !str.isEmpty();
     }
 
+    public static boolean equals(String str1, String str2) {
+        if (null == str1 || null == str2) {
+            return false;
+        }
+        return str1.equals(str2);
+    }
+
     public static String[] split(String s, char delim) {
         if (s == null || s.isEmpty())
             return EMPTY_STRING;
