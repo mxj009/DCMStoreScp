@@ -1,8 +1,8 @@
 package com.tqhy.dcm4che.storescp.tasks;
 
+import com.tqhy.dcm4che.entity.ImgCase;
 import com.tqhy.dcm4che.msg.ScuCommandMsg;
 import com.tqhy.dcm4che.storescp.configs.StorageConfig;
-import com.tqhy.dcm4che.entity.ImgCase;
 import org.apache.poi.hssf.usermodel.HSSFCell;
 import org.apache.poi.hssf.usermodel.HSSFRow;
 import org.apache.poi.hssf.usermodel.HSSFSheet;
@@ -10,7 +10,6 @@ import org.apache.poi.hssf.usermodel.HSSFWorkbook;
 import org.apache.poi.ss.usermodel.CellType;
 
 import java.io.*;
-import java.net.Socket;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Callable;
@@ -22,32 +21,23 @@ import java.util.concurrent.Callable;
  * @create 2018/5/10
  * @since 1.0.0
  */
-public class ExcelTask extends BaseTask implements Callable<List<ImgCase>> {
+public class ExcelTask extends BaseTask{
 
     private StorageConfig sdConfig;
-    private Socket socket;
 
-    @Override
     public List<ImgCase> call() {
-        DataInputStream dis = null;
         ObjectOutputStream oos = null;
         try {
-            oos = new ObjectOutputStream(socket.getOutputStream());
+            oos = out;
             ScuCommandMsg transReadyMsg = new ScuCommandMsg(1);
             transReadyMsg.setCommand(ScuCommandMsg.TRANSFER_ECXEL_READY);
             oos.writeObject(transReadyMsg);
             oos.flush();
 
-            System.out.println("ExcelTask excel runnable run...");
-            dis = new DataInputStream(socket.getInputStream());
-            //获取批次号
-            //String batchId = dis.readUTF();
-            //System.out.println("ExcelTask excel batchId is: " + batchId);
-            //获取批次备注
-            //String batchDesc = dis.readUTF();
-            //System.out.println("ExcelTask excel batchDesc is: " + batchDesc);
+            System.out.println("ExcelTask run...");
+
             //获取文件名
-            String fname = dis.readUTF();
+            String fname = (String) in.readObject();
             System.out.println("ExcelTask excel fname is: " + fname);
 
             File dir = new File(sdConfig.getDirectory());
@@ -55,12 +45,17 @@ public class ExcelTask extends BaseTask implements Callable<List<ImgCase>> {
                 dir.mkdir();
             }
             File file = new File(dir, fname.trim());
-            List<ImgCase> imgCases = saveExcel(file, dis);
+            File savedFile = saveExcel(file, in);
+            List<ImgCase> imgCases = parseExcel(savedFile);
             return imgCases;
+        } catch (EOFException e) {
+
         } catch (IOException e) {
             e.printStackTrace();
         } catch (Exception e) {
             e.printStackTrace();
+        }finally {
+            releaseStream();
         }
         return null;
     }
@@ -129,29 +124,28 @@ public class ExcelTask extends BaseTask implements Callable<List<ImgCase>> {
         return null;
     }
 
-    private List<ImgCase> saveExcel(File file, DataInputStream dis) {
+    private File saveExcel(File file, ObjectInputStream ois) {
         System.out.println("ExcelTask will save excel to dir: " + file.getPath());
         BufferedOutputStream bos = null;
         try {
             bos = new BufferedOutputStream(new FileOutputStream(file));
-            long fileLength = dis.readLong();
+            long fileLength = ois.readLong();
 
             byte[] bytes = new byte[1024 * 8];
             int len = 0;
-            while ((len = dis.read(bytes)) != -1 && file.length() < fileLength) {
+            while ((len = ois.read(bytes)) != -1 && file.length() < fileLength) {
                 System.out.println("ExcelTask writing excel..." + len);
                 System.out.println();
                 bos.write(bytes, 0, len);
                 bos.flush();
-                //System.out.println("file.length(): " + file.length() + ", fileLength: " + fileLength);
                 if (file.length() == fileLength) {
-                    //System.out.println("upload excel complete...");
-                    break;
+                    System.out.println("upload excel complete...");
+                    bos.close();
+                    return file;
                 }
             }
-            bos.close();
-            List<ImgCase> imgCases = parseExcel(file);
-            return imgCases;
+
+
         } catch (FileNotFoundException e) {
             e.printStackTrace();
         } catch (IOException e) {
@@ -168,11 +162,4 @@ public class ExcelTask extends BaseTask implements Callable<List<ImgCase>> {
         this.sdConfig = sdConfig;
     }
 
-    public Socket getSocket() {
-        return socket;
-    }
-
-    public void setSocket(Socket socket) {
-        this.socket = socket;
-    }
 }
