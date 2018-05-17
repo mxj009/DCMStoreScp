@@ -14,4 +14,5 @@ public class DicomTag {
     public static final String NAME = "00100010";
     public static final String SEX = "00100040";
     public static final String PART = "00180015";
+    public static final String SERIAL_NUMBER = "00200011";
 }
