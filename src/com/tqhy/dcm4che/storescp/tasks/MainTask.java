@@ -5,6 +5,7 @@ import com.tqhy.dcm4che.entity.ImgCase;
 import com.tqhy.dcm4che.entity.UploadCase;
 import com.tqhy.dcm4che.msg.BaseMsg;
 import com.tqhy.dcm4che.msg.ScuCommandMsg;
+import org.dcm4che3.net.service.BasicCStoreSCP;
 
 import java.io.IOException;
 import java.io.ObjectInputStream;
@@ -17,12 +18,11 @@ import java.util.List;
  * @create 2018/5/16
  * @since 1.0.0
  */
-public class SCPTask implements Runnable {
-    private Socket socket;
-    private StoreScpTask storeScpTask;
+public class MainTask implements Runnable {
+    private final Socket socket;
+    private final StoreScpTask storeScpTask;
     private AssembledBatch assembledBatch;
     private UploadCase uploadCase;
-
 
     @Override
     public void run() {
@@ -34,42 +34,42 @@ public class SCPTask implements Runnable {
             while (flag) {
                 talkScuTask.setStream(in, out);
                 ScuCommandMsg scuCommandMsg = talkScuTask.call();
-                System.out.println("SCPTask operateTask TalkScuTask submit...");
+                System.out.println("MainTask operateTask TalkScuTask submit...");
 
                 int command = scuCommandMsg.getCommand();
-                System.out.println("SCPTask buildServerSocket command is: " + command);
+                System.out.println("MainTask buildServerSocket command is: " + command);
                 switch (command) {
                     case ScuCommandMsg.TRANSFER_DICOM_REQUEST:
                         storeScpTask.setStream(in, out);
                         storeScpTask.setUploadCase(uploadCase);
                         storeScpTask.setAssembledBatch(assembledBatch);
+                        System.out.println(getClass().getSimpleName()+" TRANSFER_DICOM_REQUEST ..." + assembledBatch.getBatch());
                         storeScpTask.call();
                         flag = false;
                         break;
                     case ScuCommandMsg.CREATE_BATCH_REQUEST:
-                        CreateBatchTask createBatchTask = new CreateBatchTask();
-                        createBatchTask.setStream(in, out);
-                        assembledBatch = createBatchTask.call();
-                        System.out.println("SCPTask ScuCommandMsg.CREATE_BATCH_REQUEST complete..." + assembledBatch);
+                        BatchTask batchTask = new BatchTask();
+                        batchTask.setStream(in, out);
+                        assembledBatch = batchTask.call();
+                        System.out.println(getClass().getSimpleName()+" CREATE_BATCH_REQUEST ..." + assembledBatch.getBatch());
                         break;
                     case ScuCommandMsg.TRANSFER_ECXEL_REQUEST:
                         ExcelTask excelTask = new ExcelTask();
                         excelTask.setStream(in, out);
-                        excelTask.setSdConfig(storeScpTask.getSdConfig());
+                        excelTask.setSdConfig(storeScpTask.getSdConfig(),assembledBatch);
                         List<ImgCase> imgCasesFromExcel = excelTask.call();
                         uploadCase = new UploadCase();
                         uploadCase.setData(imgCasesFromExcel);
                         uploadCase.setBatch(assembledBatch.getBatch());
-
                         break;
                     case ScuCommandMsg.GET_ALL_INIT_INFO:
-                        SendScuInitMsgTask sendScuInitMsgTask = new SendScuInitMsgTask();
-                        sendScuInitMsgTask.setStream(in, out);
-                        BaseMsg msg = sendScuInitMsgTask.call();
-                        System.out.println("SCPTask BaseTask.INIT_MSG_TO_SCU_TASK is done...msg status: " + msg.getStatus());
+                        InitScuTask initScuTask = new InitScuTask();
+                        initScuTask.setStream(in, out);
+                        BaseMsg msg = initScuTask.call();
+                        System.out.println("MainTask BaseTask.INIT_MSG_TO_SCU_TASK is done...msg status: " + msg.getStatus());
                         break;
                     default:
-                        System.out.println("SCPTask ScuCommandMsg 为空");
+                        System.out.println("MainTask ScuCommandMsg 为空");
                         flag = false;
                         break;
                 }
@@ -80,15 +80,7 @@ public class SCPTask implements Runnable {
         }
     }
 
-    public Socket getSocket() {
-        return socket;
-    }
-
-    public void setSocket(Socket socket) {
-        this.socket = socket;
-    }
-
-    public SCPTask(Socket socket, StoreScpTask storeScpTask) {
+    public MainTask(Socket socket, StoreScpTask storeScpTask) {
         this.socket = socket;
         this.storeScpTask = storeScpTask;
     }

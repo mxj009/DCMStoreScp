@@ -96,19 +96,24 @@ public class StoreScpTask extends BaseTask {
      */
     private int parsedFileCount;
 
-    private final BasicCStoreSCP cstoreSCP = new BasicCStoreSCP(new String[]{"*"}) {
+    private BasicCStoreSCP cstoreSCP = new BasicCStoreSCP(new String[]{"*"}) {
         protected void store(Association as, PresentationContext pc, Attributes rq, PDVInputStream data, Attributes rsp) throws IOException {
             rsp.setInt(2304, VR.US, new int[]{status});
-            System.out.println("StoreScpTask store() start..");
+           // System.out.println("StoreScpTask store() start..");
             if (storageDir != null) {
                 String cuid = rq.getString(2);
                 String iuid = rq.getString(4096);
                 String tsuid = pc.getTransferSyntax();
-                File file = new File(storageDir, iuid + ".part");
+                System.out.println("StoreScpTask store() batch..."+assembledBatch.getBatch());
+                File storeDir = new File(storageDir, assembledBatch.getBatch().getBatchNo());
+                if (!storeDir.exists()) {
+                    storeDir.mkdir();
+                }
+                File file = new File(storeDir, iuid);
 
                 try {
                     storeTo(as, as.createFileMetaInformation(iuid, cuid, tsuid), data, file);
-                    System.out.println("MyStore store complete..." + file.getAbsolutePath());
+                    //System.out.println("MyStore store complete..." + file.getAbsolutePath());
                 } catch (Exception var11) {
                     deleteFile(as, file);
                     throw new DicomServiceException(272, var11);
@@ -143,7 +148,6 @@ public class StoreScpTask extends BaseTask {
             parse(file);
             SafeClose.close(out);
         }
-
     }
 
     /**
@@ -155,16 +159,17 @@ public class StoreScpTask extends BaseTask {
      * @throws IOException
      */
     private void parse(File file) {
-        AddDcm2UploadCaseTask addDcm2UploadCaseTask = new AddDcm2UploadCaseTask(file, uploadCase, assembledBatch);
+        UploadCaseTask uploadCaseTask = new UploadCaseTask(file, uploadCase, assembledBatch);
         ExecutorService executor = Executors.newSingleThreadExecutor();
-        Future<UploadCase> uploadCaseFuture = executor.submit(addDcm2UploadCaseTask);
+        Future<UploadCase> uploadCaseFuture = executor.submit(uploadCaseTask);
         try {
             uploadCase = uploadCaseFuture.get();
             System.out.println("StoreScpTask parse() uploadCase is: " + uploadCase);
             parsedFileCount++;
             if (parsedFileCount == dicomFileCount) {
                 //已经处理完毕所有上传文件
-                upLoadCases(uploadCase);
+                //upLoadCases(uploadCase);
+                fakeUpLoad(uploadCase);
                 parsedFileCount = 0;
             }
         } catch (InterruptedException e) {
@@ -172,6 +177,16 @@ public class StoreScpTask extends BaseTask {
         } catch (ExecutionException e) {
             e.printStackTrace();
         }
+    }
+
+    /**
+     * 模拟上传
+     *
+     * @param uploadCase
+     */
+    private void fakeUpLoad(UploadCase uploadCase) {
+        String json = new Gson().toJson(uploadCase);
+        System.out.println(getClass().getSimpleName() + " fakeUpLoad() json is: " + json);
     }
 
     /**
@@ -183,9 +198,10 @@ public class StoreScpTask extends BaseTask {
         OkHttpClient okHttpClient = new OkHttpClient();
         MediaType JSON = MediaType.parse("application/json; charset=utf-8");
         String json = new Gson().toJson(uploadCase);
+        System.out.println(getClass().getSimpleName() + " upLoadCases() " + json);
         RequestBody requestBody = RequestBody.create(JSON, json);
         Request request = new Request.Builder()
-                .url("http://192.168.1.219/api/dicom")
+                .url("http://192.168.1.220:8887/api/dicom")
                 .post(requestBody)
                 .build();
         try {
@@ -207,6 +223,7 @@ public class StoreScpTask extends BaseTask {
     }
 
     private DicomServiceRegistry createServiceRegistry() {
+        System.out.println(getClass().getSimpleName() + " createServiceRegistry()...");
         DicomServiceRegistry serviceRegistry = new DicomServiceRegistry();
         serviceRegistry.addDicomService(new BasicCEchoSCP());
         serviceRegistry.addDicomService(cstoreSCP);
@@ -224,12 +241,8 @@ public class StoreScpTask extends BaseTask {
         this.filePathFormat = new AttributesFormat(pattern);
     }
 
-    public void setStatus(int status) {
-        this.status = status;
-    }
-
     public ConnConfigMsg call() {
-        System.out.println(getClass().getSimpleName() + " call() start...");
+        //System.out.println(getClass().getSimpleName() + " call() start...");
         System.out.println(getClass().getSimpleName() + " aeTitle: " + connectConfig.getAeTitle() + " hostName: " + connectConfig.getHost() + " port: " + connectConfig.getPort());
         configureConnect(conn, connectConfig);
         try {
@@ -411,5 +424,9 @@ public class StoreScpTask extends BaseTask {
 
     public void setAssembledBatch(AssembledBatch assembledBatch) {
         this.assembledBatch = assembledBatch;
+    }
+
+    public BasicCStoreSCP getCstoreSCP() {
+        return cstoreSCP;
     }
 }

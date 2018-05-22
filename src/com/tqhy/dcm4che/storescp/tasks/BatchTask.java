@@ -17,7 +17,7 @@ import java.io.ObjectOutputStream;
  * @create 2018/5/15
  * @since 1.0.0
  */
-public class CreateBatchTask extends BaseTask {
+public class BatchTask extends BaseTask {
 
     public AssembledBatch call() {
         ObjectInputStream ois = null;
@@ -25,15 +25,15 @@ public class CreateBatchTask extends BaseTask {
         try {
             ois = in;
             oos = out;
-            System.out.println("CreateBatchTask start... " );
+            System.out.println("BatchTask start... " );
             ScuCommandMsg createReadyMsg = new ScuCommandMsg(1);
             createReadyMsg.setCommand(ScuCommandMsg.CREATE_BATCH_READY);
             oos.writeObject(createReadyMsg);
             oos.flush();
-            System.out.println("CreateBatchTask ScuCommandMsg.CREATE_BATCH_READY sent...");
+            System.out.println("BatchTask ScuCommandMsg.CREATE_BATCH_READY sent...");
 
             AssembledBatch assembledBatch = (AssembledBatch) ois.readObject();
-            System.out.println("CreateBatchTask AssembledBatch read..." + assembledBatch);
+            System.out.println("BatchTask AssembledBatch read..." + assembledBatch);
             oos.writeObject(new BaseMsg(BaseMsg.SUCCESS));
             oos.flush();
             return assembledBatch;
@@ -49,7 +49,7 @@ public class CreateBatchTask extends BaseTask {
         return new AssembledBatch();
     }
 
-    public CreateBatchTask() {
+    public BatchTask() {
     }
 
 }

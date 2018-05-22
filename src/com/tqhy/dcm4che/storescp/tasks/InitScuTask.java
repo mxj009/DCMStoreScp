@@ -19,7 +19,7 @@ import java.io.ObjectOutputStream;
  * @create 2018/5/14
  * @since 1.0.0
  */
-public class SendScuInitMsgTask extends BaseTask {
+public class InitScuTask extends BaseTask {
 
     private InitScuMsg initScuMsg;
 
@@ -32,11 +32,11 @@ public class SendScuInitMsgTask extends BaseTask {
             ObjectOutputStream oos = null;
             ObjectInputStream ois = null;
             try {
-                System.out.println("SendScuInitMsgTask begin send init info..." + this.initScuMsg);
+                System.out.println("InitScuTask begin send init info..." + this.initScuMsg);
                 oos = out;
                 oos.writeObject(this.initScuMsg);
                 oos.flush();
-                System.out.println("SendScuInitMsgTask send init info complete...");
+                System.out.println("InitScuTask send init info complete...");
                 return new BaseMsg(BaseMsg.SUCCESS);
             } catch (EOFException e) {
                 e.printStackTrace();

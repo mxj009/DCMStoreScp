@@ -1,8 +1,10 @@
 package com.tqhy.dcm4che.storescp.tasks;
 
+import com.tqhy.dcm4che.entity.AssembledBatch;
 import com.tqhy.dcm4che.entity.ImgCase;
 import com.tqhy.dcm4che.msg.ScuCommandMsg;
 import com.tqhy.dcm4che.storescp.configs.StorageConfig;
+import com.tqhy.dcm4che.storescp.utils.StringUtils;
 import org.apache.poi.hssf.usermodel.HSSFCell;
 import org.apache.poi.hssf.usermodel.HSSFRow;
 import org.apache.poi.hssf.usermodel.HSSFSheet;
@@ -10,9 +12,12 @@ import org.apache.poi.hssf.usermodel.HSSFWorkbook;
 import org.apache.poi.ss.usermodel.CellType;
 
 import java.io.*;
+import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Callable;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * 执行Excel相关操作,包括保存,解析等
@@ -21,9 +26,9 @@ import java.util.concurrent.Callable;
  * @create 2018/5/10
  * @since 1.0.0
  */
-public class ExcelTask extends BaseTask{
+public class ExcelTask extends BaseTask {
 
-    private StorageConfig sdConfig;
+    private File storeDir;
 
     public List<ImgCase> call() {
         ObjectOutputStream oos = null;
@@ -40,11 +45,7 @@ public class ExcelTask extends BaseTask{
             String fname = (String) in.readObject();
             System.out.println("ExcelTask excel fname is: " + fname);
 
-            File dir = new File(sdConfig.getDirectory());
-            if (!dir.exists()) {
-                dir.mkdir();
-            }
-            File file = new File(dir, fname.trim());
+            File file = new File(storeDir, fname.trim());
             File savedFile = saveExcel(file, in);
             List<ImgCase> imgCases = parseExcel(savedFile);
             return imgCases;
@@ -54,7 +55,7 @@ public class ExcelTask extends BaseTask{
             e.printStackTrace();
         } catch (Exception e) {
             e.printStackTrace();
-        }finally {
+        } finally {
             releaseStream();
         }
         return null;
@@ -71,7 +72,7 @@ public class ExcelTask extends BaseTask{
             int rows = sheet.getPhysicalNumberOfRows();
             //System.out.println("Sheet " + 0 + " \"" + wb.getSheetName(0) + "\" has " + rows + " row(s).");
             ArrayList<ImgCase> imgCases = new ArrayList<>();
-            for (int i = 0; i < rows; i++) {
+            for (int i = 1; i < rows; i++) {
                 HSSFRow row = sheet.getRow(i);
                 if (null == row) {
                     continue;
@@ -92,10 +93,12 @@ public class ExcelTask extends BaseTask{
                                     aCase.setImgInfo(value);
                                     break;
                                 case 2:
+
                                     aCase.setImgResult(value);
                                     break;
                                 case 3:
-                                    aCase.setAge(value);
+                                    double age = parseAge(value);
+                                    aCase.setAgeNumber(age);
                                     break;
                             }
                         }
@@ -122,6 +125,25 @@ public class ExcelTask extends BaseTask{
             }
         }
         return null;
+    }
+
+    private double parseAge(String ageStr) {
+        Pattern pattern = Pattern.compile("\\d+");
+        Matcher matcher = pattern.matcher(ageStr);
+        double age = 0d;
+        String format = null;
+        for (int i = 0; matcher.find(); i++) {
+            if (i == 0) {
+                age += Double.parseDouble(matcher.group(0));
+            } else if (i == 1) {
+                age += Double.parseDouble(matcher.group(0)) / 12;
+            } else {
+                age += Double.parseDouble(matcher.group(0)) / 365;
+            }
+            DecimalFormat decimalFormat = new DecimalFormat("#0.00");
+            format = decimalFormat.format(age);
+        }
+        return Double.parseDouble(format);
     }
 
     private File saveExcel(File file, ObjectInputStream ois) {
@@ -154,12 +176,18 @@ public class ExcelTask extends BaseTask{
         return null;
     }
 
-    public StorageConfig getSdConfig() {
-        return sdConfig;
-    }
 
-    public void setSdConfig(StorageConfig sdConfig) {
-        this.sdConfig = sdConfig;
+    public ExcelTask setSdConfig(StorageConfig sdConfig, AssembledBatch assembledBatch) {
+        String directory = sdConfig.getDirectory();
+        String batchNo = assembledBatch.getBatch().getBatchNo();
+        if (StringUtils.isNotEmpty(directory) && StringUtils.isNotEmpty(batchNo)) {
+            File storeDir = new File(directory, batchNo);
+            if (!storeDir.exists()) {
+                storeDir.mkdir();
+            }
+            this.storeDir = storeDir;
+        }
+        return this;
     }
 
 }

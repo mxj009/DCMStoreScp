@@ -9,6 +9,10 @@ import org.junit.Test;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.text.DecimalFormat;
+import java.text.NumberFormat;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * 测试通过POI对Excel进行处理
@@ -97,5 +101,37 @@ public class TestParseExcel {
                 e.printStackTrace();
             }
         }
+    }
+
+    @Test
+    public void testParseAge() {
+        String ageStr = "062Y10M00D";
+        Pattern pattern = Pattern.compile("\\d+");
+        Matcher matcher = pattern.matcher(ageStr);
+        String str = "";
+        double age = 0d;
+        for (int i = 0; matcher.find(); i++) {
+            if (i == 0) {
+                age += Double.parseDouble(matcher.group(0));
+            } else if (i == 1) {
+                age += Double.parseDouble(matcher.group(0)) / 12;
+            } else {
+                age += Double.parseDouble(matcher.group(0)) / 365;
+            }
+            DecimalFormat decimalFormat = new DecimalFormat("#0.00");
+            String format = decimalFormat.format(age);
+            System.out.println(Double.parseDouble(format));
+        }
+    }
+
+    @Test
+    public void testParseSerialNumber() {
+        String serialNumber = "1.0";
+        Pattern pattern = Pattern.compile("\\d+");
+        Matcher matcher = pattern.matcher(serialNumber);
+        if (matcher.find()) {
+            serialNumber = matcher.group(0);
+        }
+        System.out.println(getClass().getSimpleName() + "DicomTag.SERIAL_NUMBER: " + serialNumber);
     }
 }

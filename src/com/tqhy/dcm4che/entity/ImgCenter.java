@@ -33,6 +33,14 @@ public class ImgCenter {
      */
     private String imgMd5;
 
+    public String getBatchNo() {
+        return batchNo;
+    }
+
+    public void setBatchNo(String batchNo) {
+        this.batchNo = batchNo;
+    }
+
     public String getImgUrl() {
         return imgUrl;
     }

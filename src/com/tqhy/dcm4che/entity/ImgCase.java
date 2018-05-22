@@ -37,10 +37,15 @@ public class ImgCase {
     private String imgResult;
 
     /**
-     * 患者年龄,指的是做检查时年龄,而非当前实际年龄
-     * (0010,1010)
+     * 患者年龄出生日期
+     * (0010,0030)
      */
     private String age;
+
+    /**
+     * 患者年龄数值,由Excel得出
+     */
+    private double ageNumber;
 
     /**
      * 患者姓名
@@ -202,6 +207,28 @@ public class ImgCase {
         this.part = part;
     }
 
+    public double getAgeNumber() {
+        return ageNumber;
+    }
+
+    public void setAgeNumber(double ageNumber) {
+        this.ageNumber = ageNumber;
+    }
+
+    public void setFields(ImgCase newCase) {
+        this.setImgCount(this.getImgCount()+newCase.getImgCount());
+        this.setImgCenters(newCase.getImgCenters());
+        this.setSerialNumber(newCase.getSerialNumber());
+        this.setBatchNo(newCase.getBatchNo());
+        this.setPart(newCase.getPart());
+        this.setType(newCase.getType());
+        this.setSource(newCase.getSource());
+        this.setName(newCase.getName());
+        this.setAge(newCase.getAge());
+        this.setSex(newCase.getSex());
+        this.setAcquisitionDate(newCase.getAcquisitionDate());
+    }
+
     @Override
     public String toString() {
         return "ImgCase{" +
@@ -212,6 +239,13 @@ public class ImgCase {
                 ", age='" + age + '\'' +
                 ", name='" + name + '\'' +
                 ", sex='" + sex + '\'' +
+                ", batchNo='" + batchNo + '\'' +
+                ", imgCount=" + imgCount +
+                ", source='" + source + '\'' +
+                ", type='" + type + '\'' +
+                ", part='" + part + '\'' +
+                ", imgCenters=" + imgCenters +
+                ", serialNumber=" + serialNumber +
                 '}';
     }
 
@@ -234,7 +268,6 @@ public class ImgCase {
 
     @Override
     public int hashCode() {
-
         return Objects.hash(acquisitionDate, patientId, imgInfo, imgResult, age, name, sex, batchNo, source, type, part, serialNumber);
     }
 }

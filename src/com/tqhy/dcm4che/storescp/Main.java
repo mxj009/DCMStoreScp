@@ -4,7 +4,7 @@ import com.tqhy.dcm4che.msg.ConnConfigMsg;
 import com.tqhy.dcm4che.storescp.configs.ConnectConfig;
 import com.tqhy.dcm4che.storescp.configs.StorageConfig;
 import com.tqhy.dcm4che.storescp.configs.TransferCapabilityConfig;
-import com.tqhy.dcm4che.storescp.tasks.SCPTask;
+import com.tqhy.dcm4che.storescp.tasks.MainTask;
 import com.tqhy.dcm4che.storescp.tasks.StoreScpTask;
 import javafx.application.Application;
 import javafx.geometry.Insets;
@@ -121,6 +121,9 @@ public class Main extends Application {
         primaryStage.setTitle("STORESCP");
         primaryStage.setScene(scene);
         primaryStage.show();
+        primaryStage.setOnCloseRequest(e->{
+            System.exit(0);
+        });
     }
 
     private void buildServerSocket(ConnectConfig connConfig) {
@@ -132,9 +135,8 @@ public class Main extends Application {
                 StoreScpTask storeScpTask = null;
                 ExecutorService pool = Executors.newCachedThreadPool();
                 while (true) {
-                    System.out.println("StoreScpTask buildServerSocket() serverSocket..." + serverSocket.getLocalPort());
                     socket = serverSocket.accept();
-                    System.out.println("StoreScpTask buildServerSocket() accept socket: " + socket);
+                    System.out.println(getClass().getSimpleName()+" buildServerSocket() accept socket: " + socket);
 
                     storeScpTask = new StoreScpTask();
                     storeScpTask.setConnectConfig(connConfig);
@@ -143,8 +145,8 @@ public class Main extends Application {
                     StorageConfig sdConfig = new StorageConfig();
                     sdConfig.setDirectory(tx_store.getText().trim());
                     storeScpTask.setSdConfig(sdConfig);
-                    SCPTask scpTask = new SCPTask(socket, storeScpTask);
-                    pool.submit(scpTask);
+                    MainTask mainTask = new MainTask(socket, storeScpTask);
+                    pool.submit(mainTask);
                 }
             } catch (IOException e) {
                 e.printStackTrace();
