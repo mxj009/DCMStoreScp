@@ -5,6 +5,9 @@ import com.tqhy.dcm4che.entity.ImgCase;
 import com.tqhy.dcm4che.entity.UploadCase;
 import com.tqhy.dcm4che.msg.BaseMsg;
 import com.tqhy.dcm4che.msg.ScuCommandMsg;
+import com.tqhy.dcm4che.storescp.configs.ConnectConfig;
+import com.tqhy.dcm4che.storescp.configs.StorageConfig;
+import com.tqhy.dcm4che.storescp.configs.TransferCapabilityConfig;
 import org.dcm4che3.net.service.BasicCStoreSCP;
 
 import java.io.IOException;
@@ -20,9 +23,10 @@ import java.util.List;
  */
 public class MainTask implements Runnable {
     private final Socket socket;
-    private final StoreScpTask storeScpTask;
     private AssembledBatch assembledBatch;
     private UploadCase uploadCase;
+    private ConnectConfig connConfig;
+    private StorageConfig sdConfig;
 
     @Override
     public void run() {
@@ -40,10 +44,14 @@ public class MainTask implements Runnable {
                 System.out.println("MainTask buildServerSocket command is: " + command);
                 switch (command) {
                     case ScuCommandMsg.TRANSFER_DICOM_REQUEST:
+                        StoreScpTask storeScpTask = new StoreScpTask();
+                        storeScpTask.setConnectConfig(connConfig);
+                        storeScpTask.setTcConfig(new TransferCapabilityConfig());
+                        storeScpTask.setSdConfig(sdConfig);
                         storeScpTask.setStream(in, out);
                         storeScpTask.setUploadCase(uploadCase);
                         storeScpTask.setAssembledBatch(assembledBatch);
-                        System.out.println(getClass().getSimpleName()+" TRANSFER_DICOM_REQUEST ..." + assembledBatch.getBatch());
+                        System.out.println(getClass().getSimpleName() + " TRANSFER_DICOM_REQUEST ..." + assembledBatch.getBatch());
                         storeScpTask.call();
                         flag = false;
                         break;
@@ -51,12 +59,12 @@ public class MainTask implements Runnable {
                         BatchTask batchTask = new BatchTask();
                         batchTask.setStream(in, out);
                         assembledBatch = batchTask.call();
-                        System.out.println(getClass().getSimpleName()+" CREATE_BATCH_REQUEST ..." + assembledBatch.getBatch());
+                        System.out.println(getClass().getSimpleName() + " CREATE_BATCH_REQUEST ..." + assembledBatch.getBatch());
                         break;
                     case ScuCommandMsg.TRANSFER_ECXEL_REQUEST:
                         ExcelTask excelTask = new ExcelTask();
                         excelTask.setStream(in, out);
-                        excelTask.setSdConfig(storeScpTask.getSdConfig(),assembledBatch);
+                        excelTask.setSdConfig(sdConfig, assembledBatch);
                         List<ImgCase> imgCasesFromExcel = excelTask.call();
                         uploadCase = new UploadCase();
                         uploadCase.setData(imgCasesFromExcel);
@@ -80,9 +88,10 @@ public class MainTask implements Runnable {
         }
     }
 
-    public MainTask(Socket socket, StoreScpTask storeScpTask) {
+    public MainTask(Socket socket, ConnectConfig connConfig, StorageConfig sdConfig) {
         this.socket = socket;
-        this.storeScpTask = storeScpTask;
+        this.connConfig = connConfig;
+        this.sdConfig = sdConfig;
     }
 
 }
