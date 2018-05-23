@@ -14,6 +14,7 @@ import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextField;
 import javafx.scene.control.Tooltip;
+import javafx.scene.image.Image;
 import javafx.scene.layout.GridPane;
 import javafx.scene.paint.Color;
 import javafx.scene.text.Text;
@@ -118,10 +119,12 @@ public class Main extends Application {
         root.add(tx_result, 1, 8);
 
         scene = new Scene(root, 500, 400);
+
         primaryStage.setTitle("STORESCP");
+        primaryStage.getIcons().add(new Image(Main.class.getResourceAsStream("/icon.png")));
         primaryStage.setScene(scene);
         primaryStage.show();
-        primaryStage.setOnCloseRequest(e->{
+        primaryStage.setOnCloseRequest(e -> {
             System.exit(0);
         });
     }
@@ -132,20 +135,13 @@ public class Main extends Application {
             try {
                 ServerSocket serverSocket = new ServerSocket(connConfig.getPort() + 1);
                 Socket socket = null;
-                StoreScpTask storeScpTask = null;
                 ExecutorService pool = Executors.newCachedThreadPool();
                 while (true) {
                     socket = serverSocket.accept();
-                    System.out.println(getClass().getSimpleName()+" buildServerSocket() accept socket: " + socket);
-
-                    storeScpTask = new StoreScpTask();
-                    storeScpTask.setConnectConfig(connConfig);
-                    TransferCapabilityConfig tcConfig = new TransferCapabilityConfig();
-                    storeScpTask.setTcConfig(tcConfig);
+                    System.out.println(getClass().getSimpleName() + " buildServerSocket() accept socket: " + socket);
                     StorageConfig sdConfig = new StorageConfig();
                     sdConfig.setDirectory(tx_store.getText().trim());
-                    storeScpTask.setSdConfig(sdConfig);
-                    MainTask mainTask = new MainTask(socket, storeScpTask);
+                    MainTask mainTask = new MainTask(socket, connConfig, sdConfig);
                     pool.submit(mainTask);
                 }
             } catch (IOException e) {
