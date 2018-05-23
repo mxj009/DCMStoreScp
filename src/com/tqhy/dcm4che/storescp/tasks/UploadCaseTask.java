@@ -36,11 +36,11 @@ public class UploadCaseTask extends BaseTask implements Callable<UploadCase> {
     private UploadCase uploadCase;
 
     @Override
-    public UploadCase call() throws Exception {
+    public UploadCase call() {
         try {
             File jsonFile = dicom2Json(dcmFile);
             ImgCase newCase = Json2Object(jsonFile);
-            deleteFile(jsonFile);
+            //deleteFile(jsonFile);
             newCase = generateImgCenter(dcmFile, newCase);
             System.out.println(getClass().getSimpleName() + " newCase: " + newCase);
 
@@ -88,23 +88,25 @@ public class UploadCaseTask extends BaseTask implements Callable<UploadCase> {
     private void deleteFile(File jsonFile) {
         if (jsonFile.exists()) {
             jsonFile.delete();
-            System.out.println(getClass().getSimpleName()+" deleteFile...");
+            System.out.println(getClass().getSimpleName() + " deleteFile...");
         }
     }
 
     private ImgCase generateImgCenter(File dcmFile, ImgCase newCase) {
         ArrayList<ImgCenter> imgCenters = new ArrayList<>();
         ImgCenter imgCenter = new ImgCenter();
-        ImgCenterTask imgCenterTask = new ImgCenterTask(dcmFile);
         //设置图像地址
-        String imgUrl = imgCenterTask.getImgUrl();
-        imgCenter.setImgUrl(imgUrl);
-        //设置1024图像地址
-        String img1024Url = imgCenterTask.getImg1024Url();
-        imgCenter.setImg1024Url(img1024Url);
-        //设置缩略图地址
-        String imgUrlThumb = imgCenterTask.getImgUrlThumb();
-        imgCenter.setImgUrlThumb(imgUrlThumb);
+        String imgUrl = ImgCenterTask.getImgUrl(dcmFile);
+        if (null != imgUrl) {
+            imgCenter.setImgUrl(imgUrl);
+            //设置1024图像地址
+            String img1024Url = ImgCenterTask.getImg1024Url(new File(imgUrl));
+            imgCenter.setImg1024Url(img1024Url);
+            //设置缩略图地址
+            String imgUrlThumb = ImgCenterTask.getImgUrlThumb(new File(imgUrl));
+            imgCenter.setImgUrlThumb(imgUrlThumb);
+        }
+
         //设置MD5值
         String md5 = MD5Utils.getMD5(dcmFile);
         imgCenter.setImgMd5(md5);
