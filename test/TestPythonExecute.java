@@ -51,8 +51,7 @@ public class TestPythonExecute {
     public void testDcm2Jpg() {
         String dicomPath = "C:/Users/qing/Desktop/dcm_pics/IMG00001";
         File dicomFile = new File(dicomPath);
-        Dcm2JpgTask dcm2JpgTask = new Dcm2JpgTask(dicomFile);
-        File jpgFile = dcm2JpgTask.call();
+        File jpgFile = Dcm2JpgTask.getInstance().convert(dicomFile);
         System.out.println(null == jpgFile ? "fail" : jpgFile.getAbsolutePath());
     }
 
@@ -67,5 +66,16 @@ public class TestPythonExecute {
         String filePath = resource.getFile();
         System.out.println(path);
         System.out.println(filePath);
+    }
+
+    /**
+     * 测试解析Python文件路径
+     */
+    @Test
+    public void testParsePath() {
+        String originPath = "/D:/workspace/DCMStoreScp/out/artifacts/DCMStoreScp_jar/DCMStoreScp.jar";
+        int end = originPath.lastIndexOf("/");
+        String substring = originPath.substring(1, end);
+        System.out.println(substring);
     }
 }
