@@ -22,7 +22,7 @@ import java.util.Iterator;
  */
 public class Dcm2JpgTask {
 
-    private File dicomFile;
+    private static Dcm2JpgTask instance = new Dcm2JpgTask();
     private int windowIndex;
     private int voiLUTIndex;
     private float windowWidth;
@@ -34,13 +34,7 @@ public class Dcm2JpgTask {
     private int overlayActivationMask = 0xffff;
     private ImageWriteParam imageWriteParam;
     private ImageWriter imageWriter;
-    private final ImageReader imageReader = ImageIO.getImageReadersByFormatName("DICOM").next();
-
-    public File call() {
-        initImageWriter();
-        File converted = convert();
-        return converted;
-    }
+    private ImageReader imageReader;
 
     /**
      * 初始化ImageWriter
@@ -56,20 +50,22 @@ public class Dcm2JpgTask {
 
     /**
      * 转换DCM文件到同一文件夹下jpg文件夹下
+     *
      * @return 转换后的jgp文件File对象
      */
-    public File convert() {
+    public File convert(File dicomFile) {
         if (null == dicomFile) {
             return null;
         }
         if (dicomFile.exists()) {
-            try {
+
+            try (ImageInputStream iis = ImageIO.createImageInputStream(dicomFile)) {
                 File jpgDir = new File(dicomFile.getParent() + "/jpg");
                 if (!jpgDir.exists()) {
                     jpgDir.mkdir();
                 }
                 File dest = new File(jpgDir, dicomFile.getName() + ".jpg");
-                ImageInputStream iis = ImageIO.createImageInputStream(dicomFile);
+                imageReader = ImageIO.getImageReadersByFormatName("DICOM").next();
                 imageReader.setInput(iis);
                 BufferedImage bi = imageReader.read(0, readParam());
                 ColorModel cm = bi.getColorModel();
@@ -88,7 +84,6 @@ public class Dcm2JpgTask {
                 } finally {
                     try {
                         ios.close();
-                        iis.close();
                     } catch (IOException ignore) {
                     }
                 }
@@ -101,123 +96,23 @@ public class Dcm2JpgTask {
 
     /**
      * 设置DicomImageReadParam 数
+     *
      * @return
      */
     private ImageReadParam readParam() {
         DicomImageReadParam param = (DicomImageReadParam) imageReader.getDefaultReadParam();
-        param.setWindowCenter(windowCenter);
-        param.setWindowWidth(windowWidth);
         param.setAutoWindowing(autoWindowing);
-        param.setWindowIndex(windowIndex);
-        param.setVOILUTIndex(voiLUTIndex);
         param.setPreferWindow(preferWindow);
-        param.setPresentationState(prState);
         param.setOverlayActivationMask(overlayActivationMask);
         param.setOverlayGrayscaleValue(overlayGrayscaleValue);
         return param;
     }
 
-    public Dcm2JpgTask(File dicomFile) {
-        this.dicomFile = dicomFile;
+    private Dcm2JpgTask() {
+        initImageWriter();
     }
 
-    public File getDicomFile() {
-        return dicomFile;
-    }
-
-    public void setDicomFile(File dicomFile) {
-        this.dicomFile = dicomFile;
-    }
-
-    public int getWindowIndex() {
-        return windowIndex;
-    }
-
-    public void setWindowIndex(int windowIndex) {
-        this.windowIndex = windowIndex;
-    }
-
-    public int getVoiLUTIndex() {
-        return voiLUTIndex;
-    }
-
-    public void setVoiLUTIndex(int voiLUTIndex) {
-        this.voiLUTIndex = voiLUTIndex;
-    }
-
-    public float getWindowWidth() {
-        return windowWidth;
-    }
-
-    public void setWindowWidth(float windowWidth) {
-        this.windowWidth = windowWidth;
-    }
-
-    public float getWindowCenter() {
-        return windowCenter;
-    }
-
-    public void setWindowCenter(float windowCenter) {
-        this.windowCenter = windowCenter;
-    }
-
-    public Attributes getPrState() {
-        return prState;
-    }
-
-    public void setPrState(Attributes prState) {
-        this.prState = prState;
-    }
-
-    public boolean isAutoWindowing() {
-        return autoWindowing;
-    }
-
-    public void setAutoWindowing(boolean autoWindowing) {
-        this.autoWindowing = autoWindowing;
-    }
-
-    public boolean isPreferWindow() {
-        return preferWindow;
-    }
-
-    public void setPreferWindow(boolean preferWindow) {
-        this.preferWindow = preferWindow;
-    }
-
-    public int getOverlayGrayscaleValue() {
-        return overlayGrayscaleValue;
-    }
-
-    public void setOverlayGrayscaleValue(int overlayGrayscaleValue) {
-        this.overlayGrayscaleValue = overlayGrayscaleValue;
-    }
-
-    public int getOverlayActivationMask() {
-        return overlayActivationMask;
-    }
-
-    public void setOverlayActivationMask(int overlayActivationMask) {
-        this.overlayActivationMask = overlayActivationMask;
-    }
-
-    public ImageWriteParam getImageWriteParam() {
-        return imageWriteParam;
-    }
-
-    public void setImageWriteParam(ImageWriteParam imageWriteParam) {
-        this.imageWriteParam = imageWriteParam;
-    }
-
-    public ImageWriter getImageWriter() {
-        return imageWriter;
-    }
-
-    public void setImageWriter(ImageWriter imageWriter) {
-        this.imageWriter = imageWriter;
-    }
-
-    public ImageReader getImageReader() {
-        return imageReader;
+    public static Dcm2JpgTask getInstance() {
+        return instance;
     }
 }
