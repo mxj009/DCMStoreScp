@@ -48,11 +48,24 @@ import java.util.concurrent.*;
  */
 public class StoreScpTask extends BaseTask {
 
-    private static final Logger LOG = LoggerFactory.getLogger(StoreScpTask.class);
-    private static ResourceBundle rb = ResourceBundle.getBundle("messages");
+    /**
+     * ApplicationEntity容器,除Connection外,均采用默认配置
+     */
     private Device device;
+
+    /**
+     * 除Connection与title外,均采用默认配置
+     */
     private ApplicationEntity ae;
+
+    /**
+     * DCM Connecttion对象,由{@link ConnectConfig}完成初始化
+     */
     private Connection conn;
+
+    /**
+     * 文件存储根路径,由{@link StorageConfig}完成初始化
+     */
     private File storageDir;
 
     /**
@@ -100,6 +113,9 @@ public class StoreScpTask extends BaseTask {
      */
     private int parsedFileCount;
 
+    /**
+     * 具体负责存储与解析的CStoreSCP对象
+     */
     private BasicCStoreSCP cstoreSCP;
 
     public StoreScpTask() {
@@ -118,20 +134,20 @@ public class StoreScpTask extends BaseTask {
                     if (!storeDir.exists()) {
                         storeDir.mkdir();
                     }
-                    File file = new File(storeDir, iuid);
+                    File file = new File(storeDir, iuid + ".part");
 
                     try {
-                        storeTo(as, as.createFileMetaInformation(iuid, cuid, tsuid), data, file);
+                        storeTo(as.createFileMetaInformation(iuid, cuid, tsuid), data, file);
+                        renameTo(file, new File(storeDir, iuid));
                         //System.out.println("MyStore store complete..." + file.getAbsolutePath());
                     } catch (Exception var11) {
-                        deleteFile(as, file);
+                        deleteFile(file);
                         throw new DicomServiceException(272, var11);
                     }
                 }
             }
         };
         conn = new Connection();
-
         ae = new ApplicationEntity("*");
         ae.setAssociationAcceptor(true);
         ae.addConnection(conn);
@@ -143,15 +159,47 @@ public class StoreScpTask extends BaseTask {
         device.addApplicationEntity(ae);
     }
 
-    private void storeTo(Association as, Attributes fmi, PDVInputStream data, File file) throws IOException {
+    /**
+     * 重命名文件,确保文件上传完成,上传完成后调用{@link StoreScpTask#parse(File)}方法对
+     * 上传文件进行解析.
+     *
+     * @param from 待重命名文件
+     * @param dest 重命名后文件
+     * @see StoreScpTask#parse(File)
+     */
+    private void renameTo(File from, File dest) {
+        if (!dest.getParentFile().mkdirs()) {
+            dest.delete();
+        }
+        try {
+            if (!from.renameTo(dest)) {
+                throw new IOException("Failed to rename " + from + " to " + dest);
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        } finally {
+            parse(dest);
+        }
+    }
+
+    /**
+     * 保存上传文件,该方法中保存的文件并非最终使用的DCM文件,而是<i>.part</i>结尾的临时文件;
+     * 调用该方法后,必须再调用{@link StoreScpTask#renameTo(File, File)}方法,以确保文件上传完成,
+     * 在进行其他操作,比如调用{@link StoreScpTask#parse(File)}进行DCM文件解析的操作.
+     *
+     * @param fmi  文件元信息
+     * @param data PDV流数据
+     * @param file 接收上传的临时文件
+     * @throws IOException
+     * @see StoreScpTask#renameTo(File, File)
+     */
+    private void storeTo(Attributes fmi, PDVInputStream data, File file) throws IOException {
         file.getParentFile().mkdirs();
         DicomOutputStream out = new DicomOutputStream(file);
-
         try {
             out.writeFileMetaInformation(fmi);
             data.copyTo(out);
         } finally {
-            parse(file);
             SafeClose.close(out);
         }
     }
@@ -229,14 +277,24 @@ public class StoreScpTask extends BaseTask {
         }
     }
 
-    private void deleteFile(Association as, File file) {
+    /**
+     * 文件上传失败则删除临时文件
+     *
+     * @param file 要删除的临时文件
+     * @see StoreScpTask#parse(File)
+     */
+    private void deleteFile(File file) {
         if (file.delete()) {
-            LOG.info("{}: M-DELETE {}", as, file);
+            System.out.println(getClass().getSimpleName() + "delete file: " + file);
         } else {
-            LOG.warn("{}: M-DELETE {} failed!", as, file);
+            System.out.println(getClass().getSimpleName() + "delete file failed: " + file);
         }
     }
 
+    /**
+     * 向Device对象注册服务
+     * @return
+     */
     private DicomServiceRegistry createServiceRegistry() {
         System.out.println(getClass().getSimpleName() + " createServiceRegistry()...");
         DicomServiceRegistry serviceRegistry = new DicomServiceRegistry();
@@ -245,6 +303,10 @@ public class StoreScpTask extends BaseTask {
         return serviceRegistry;
     }
 
+    /**
+     * 设置存储根路径
+     * @param storageDir 存储根路径
+     */
     public void setStorageDirectory(File storageDir) {
         if (storageDir != null) {
             storageDir.mkdirs();
@@ -346,6 +408,13 @@ public class StoreScpTask extends BaseTask {
         conn.setTcpNoDelay(!connectConfig.isNotTcpDelay());
     }
 
+    /**
+     * 给ApplicationEntity绑定链接
+     * @param conn
+     * @param ae
+     * @param connectConfig
+     * @throws Exception
+     */
     private void bindConnect(Connection conn, ApplicationEntity ae, ConnectConfig connectConfig) throws Exception {
         if (null == connectConfig) {
             throw new Exception("connectConfig 为null");
