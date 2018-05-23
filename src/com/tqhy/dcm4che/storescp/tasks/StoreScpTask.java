@@ -174,8 +174,8 @@ public class StoreScpTask extends BaseTask {
             parsedFileCount++;
             if (parsedFileCount == dicomFileCount) {
                 //已经处理完毕所有上传文件
-                //upLoadCases(uploadCase);
-                fakeUpLoad(uploadCase);
+                //uploadCasesByHttp(uploadCase);
+                uploadCasesByMq(uploadCase);
                 parsedFileCount = 0;
                 device.unbindConnections();
                 device.reconfigure(new Device());
@@ -196,11 +196,11 @@ public class StoreScpTask extends BaseTask {
      *
      * @param uploadCase
      */
-    private void fakeUpLoad(UploadCase uploadCase) {
+    private void uploadCasesByMq(UploadCase uploadCase) {
         Type type = new TypeToken<UploadCase>() {
         }.getType();
         String json = new Gson().toJson(uploadCase, type);
-        System.out.println(getClass().getSimpleName() + " fakeUpLoad() json is: " + json);
+        System.out.println(getClass().getSimpleName() + " uploadCasesByMq() json is: " + json);
         MqClientUtils.getMqClient().sendMessage(json);
     }
 
@@ -209,11 +209,11 @@ public class StoreScpTask extends BaseTask {
      *
      * @param uploadCase
      */
-    private void upLoadCases(UploadCase uploadCase) {
+    private void uploadCasesByHttp(UploadCase uploadCase) {
         OkHttpClient okHttpClient = new OkHttpClient();
         MediaType JSON = MediaType.parse("application/json; charset=utf-8");
         String json = new Gson().toJson(uploadCase);
-        System.out.println(getClass().getSimpleName() + " upLoadCases() " + json);
+        System.out.println(getClass().getSimpleName() + " uploadCasesByHttp() " + json);
         RequestBody requestBody = RequestBody.create(JSON, json);
         Request request = new Request.Builder()
                 .url("http://192.168.1.220:8887/api/dicom")
@@ -222,7 +222,7 @@ public class StoreScpTask extends BaseTask {
         try {
             Response response = okHttpClient.newCall(request).execute();
             if (response.isSuccessful()) {
-                System.out.println(getClass().getSimpleName() + " upLoadCases() " + response.body().string());
+                System.out.println(getClass().getSimpleName() + " uploadCasesByHttp() " + response.body().string());
             }
         } catch (IOException e) {
             e.printStackTrace();
