@@ -1,11 +1,9 @@
-package com.tqhy.dcm4che.storescp;
+package com.tqhy.dcm4che;
 
 import com.tqhy.dcm4che.msg.ConnConfigMsg;
 import com.tqhy.dcm4che.storescp.configs.ConnectConfig;
 import com.tqhy.dcm4che.storescp.configs.StorageConfig;
-import com.tqhy.dcm4che.storescp.configs.TransferCapabilityConfig;
 import com.tqhy.dcm4che.storescp.tasks.MainTask;
-import com.tqhy.dcm4che.storescp.tasks.StoreScpTask;
 import javafx.application.Application;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -69,6 +67,7 @@ public class Main extends Application {
     private Text tx_result;
 
     private Button bt_start;
+    public static String rootPath;
 
     @Override
     public void start(Stage primaryStage) throws Exception {
@@ -151,6 +150,10 @@ public class Main extends Application {
     }
 
     public static void main(String[] args) {
+        String jarPath = Main.class.getProtectionDomain().getCodeSource().getLocation().getFile();
+        System.out.println("file is: " + jarPath);
+        int end = jarPath.lastIndexOf("/");
+        rootPath = jarPath.substring(1, end);
         launch(args);
     }
 }
