@@ -1,13 +1,17 @@
 package com.tqhy.dcm4che.storescp.tasks;
 
 import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
 import com.tqhy.dcm4che.entity.AssembledBatch;
 import com.tqhy.dcm4che.entity.ImgCase;
 import com.tqhy.dcm4che.entity.UploadCase;
-import com.tqhy.dcm4che.msg.*;
+import com.tqhy.dcm4che.msg.ConnConfigMsg;
+import com.tqhy.dcm4che.msg.ScuCommandMsg;
+import com.tqhy.dcm4che.msg.UpLoadInfoMsg;
 import com.tqhy.dcm4che.storescp.configs.ConnectConfig;
 import com.tqhy.dcm4che.storescp.configs.StorageConfig;
 import com.tqhy.dcm4che.storescp.configs.TransferCapabilityConfig;
+import com.tqhy.dcm4che.storescp.utils.MqClientUtils;
 import com.tqhy.dcm4che.storescp.utils.StringUtils;
 import okhttp3.*;
 import org.dcm4che3.data.Attributes;
@@ -21,13 +25,14 @@ import org.dcm4che3.net.service.BasicCStoreSCP;
 import org.dcm4che3.net.service.DicomServiceException;
 import org.dcm4che3.net.service.DicomServiceRegistry;
 import org.dcm4che3.tool.common.CLIUtils;
-import org.dcm4che3.util.AttributesFormat;
 import org.dcm4che3.util.SafeClose;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
+import java.lang.reflect.Type;
+import java.security.GeneralSecurityException;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Properties;
@@ -45,11 +50,10 @@ public class StoreScpTask extends BaseTask {
 
     private static final Logger LOG = LoggerFactory.getLogger(StoreScpTask.class);
     private static ResourceBundle rb = ResourceBundle.getBundle("messages");
-    private final Device device;
-    private final ApplicationEntity ae;
-    private final Connection conn;
+    private Device device;
+    private ApplicationEntity ae;
+    private Connection conn;
     private File storageDir;
-    private AttributesFormat filePathFormat;
 
     /**
      * 返回给客户端状态码,默认0000H
@@ -96,34 +100,36 @@ public class StoreScpTask extends BaseTask {
      */
     private int parsedFileCount;
 
-    private BasicCStoreSCP cstoreSCP = new BasicCStoreSCP(new String[]{"*"}) {
-        protected void store(Association as, PresentationContext pc, Attributes rq, PDVInputStream data, Attributes rsp) throws IOException {
-            rsp.setInt(2304, VR.US, new int[]{status});
-           // System.out.println("StoreScpTask store() start..");
-            if (storageDir != null) {
-                String cuid = rq.getString(2);
-                String iuid = rq.getString(4096);
-                String tsuid = pc.getTransferSyntax();
-                System.out.println("StoreScpTask store() batch..."+assembledBatch.getBatch());
-                File storeDir = new File(storageDir, assembledBatch.getBatch().getBatchNo());
-                if (!storeDir.exists()) {
-                    storeDir.mkdir();
-                }
-                File file = new File(storeDir, iuid);
-
-                try {
-                    storeTo(as, as.createFileMetaInformation(iuid, cuid, tsuid), data, file);
-                    //System.out.println("MyStore store complete..." + file.getAbsolutePath());
-                } catch (Exception var11) {
-                    deleteFile(as, file);
-                    throw new DicomServiceException(272, var11);
-                }
-            }
-        }
-    };
-
+    private BasicCStoreSCP cstoreSCP;
 
     public StoreScpTask() {
+        cstoreSCP = new BasicCStoreSCP(new String[]{"*"}) {
+            protected void store(Association as, PresentationContext pc, Attributes rq, PDVInputStream data, Attributes rsp) throws IOException {
+                rsp.setInt(2304, VR.US, new int[]{status});
+                // System.out.println("StoreScpTask store() start..");
+                if (storageDir != null) {
+                    String cuid = rq.getString(2);
+                    String iuid = rq.getString(4096);
+                    String tsuid = pc.getTransferSyntax();
+
+                    System.out.println("StoreScpTask store() batch..." + assembledBatch.getBatch());
+                    System.out.println("StoreScpTask store() thread..." + Thread.currentThread().getName());
+                    File storeDir = new File(storageDir, assembledBatch.getBatch().getBatchNo());
+                    if (!storeDir.exists()) {
+                        storeDir.mkdir();
+                    }
+                    File file = new File(storeDir, iuid);
+
+                    try {
+                        storeTo(as, as.createFileMetaInformation(iuid, cuid, tsuid), data, file);
+                        //System.out.println("MyStore store complete..." + file.getAbsolutePath());
+                    } catch (Exception var11) {
+                        deleteFile(as, file);
+                        throw new DicomServiceException(272, var11);
+                    }
+                }
+            }
+        };
         conn = new Connection();
 
         ae = new ApplicationEntity("*");
@@ -171,10 +177,16 @@ public class StoreScpTask extends BaseTask {
                 //upLoadCases(uploadCase);
                 fakeUpLoad(uploadCase);
                 parsedFileCount = 0;
+                device.unbindConnections();
+                device.reconfigure(new Device());
             }
         } catch (InterruptedException e) {
             e.printStackTrace();
         } catch (ExecutionException e) {
+            e.printStackTrace();
+        } catch (GeneralSecurityException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
             e.printStackTrace();
         }
     }
@@ -185,8 +197,11 @@ public class StoreScpTask extends BaseTask {
      * @param uploadCase
      */
     private void fakeUpLoad(UploadCase uploadCase) {
-        String json = new Gson().toJson(uploadCase);
+        Type type = new TypeToken<UploadCase>() {
+        }.getType();
+        String json = new Gson().toJson(uploadCase, type);
         System.out.println(getClass().getSimpleName() + " fakeUpLoad() json is: " + json);
+        MqClientUtils.getMqClient().sendMessage(json);
     }
 
     /**
@@ -237,13 +252,11 @@ public class StoreScpTask extends BaseTask {
         this.storageDir = storageDir;
     }
 
-    public void setStorageFilePathFormat(String pattern) {
-        this.filePathFormat = new AttributesFormat(pattern);
-    }
-
     public ConnConfigMsg call() {
         //System.out.println(getClass().getSimpleName() + " call() start...");
-        System.out.println(getClass().getSimpleName() + " aeTitle: " + connectConfig.getAeTitle() + " hostName: " + connectConfig.getHost() + " port: " + connectConfig.getPort());
+        //System.out.println(getClass().getSimpleName() + " aeTitle: " + connectConfig.getAeTitle() + " hostName: " + connectConfig.getHost() + " port: " + connectConfig.getPort());
+        System.out.println(getClass().getSimpleName() + " call() Batch: " + assembledBatch.getBatch());
+        System.out.println(getClass().getSimpleName() + " call() thread: " + Thread.currentThread().getName());
         configureConnect(conn, connectConfig);
         try {
             bindConnect(conn, ae, connectConfig);
@@ -358,7 +371,7 @@ public class StoreScpTask extends BaseTask {
             setStorageDirectory(new File(StringUtils.isNotEmpty(directory) ? directory : StorageConfig.DEFAULT_DIRECTORY));
 
             if (StringUtils.isNotEmpty(sdConfig.getFilePath())) {
-                setStorageFilePathFormat(sdConfig.getFilePath());
+                //setStorageFilePathFormat(sdConfig.getFilePath());
             }
         }
 
