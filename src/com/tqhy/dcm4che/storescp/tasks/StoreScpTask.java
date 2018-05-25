@@ -1,6 +1,7 @@
 package com.tqhy.dcm4che.storescp.tasks;
 
 import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
 import com.tqhy.dcm4che.entity.AssembledBatch;
 import com.tqhy.dcm4che.entity.ImgCase;
@@ -26,8 +27,6 @@ import org.dcm4che3.net.service.DicomServiceException;
 import org.dcm4che3.net.service.DicomServiceRegistry;
 import org.dcm4che3.tool.common.CLIUtils;
 import org.dcm4che3.util.SafeClose;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
@@ -36,7 +35,6 @@ import java.security.GeneralSecurityException;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Properties;
-import java.util.ResourceBundle;
 import java.util.concurrent.*;
 
 /**
@@ -247,7 +245,8 @@ public class StoreScpTask extends BaseTask {
     private void uploadCasesByMq(UploadCase uploadCase) {
         Type type = new TypeToken<UploadCase>() {
         }.getType();
-        String json = new Gson().toJson(uploadCase, type);
+        Gson gson = new GsonBuilder().serializeNulls().create();
+        String json = gson.toJson(uploadCase, type);
         System.out.println(getClass().getSimpleName() + " uploadCasesByMq() json is: " + json);
         MqClientUtils.getMqClient().sendMessage(json);
     }
