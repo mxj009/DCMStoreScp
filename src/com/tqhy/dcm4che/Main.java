@@ -150,6 +150,8 @@ public class Main extends Application {
     }
 
     public static void main(String[] args) {
+        String osName = System.getProperty("os.name");
+        int begin = osName.toLowerCase().startsWith("win") ? 1 : 0;
         String jarPath = Main.class.getProtectionDomain().getCodeSource().getLocation().getFile();
         //System.out.println("file location is: " + jarPath);
         int end = jarPath.lastIndexOf("/");
