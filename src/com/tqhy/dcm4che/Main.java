@@ -155,7 +155,7 @@ public class Main extends Application {
         String jarPath = Main.class.getProtectionDomain().getCodeSource().getLocation().getFile();
         //System.out.println("file location is: " + jarPath);
         int end = jarPath.lastIndexOf("/");
-        rootPath = jarPath.substring(0, end);
+        rootPath = jarPath.substring(begin, end);
         launch(args);
     }
 }
