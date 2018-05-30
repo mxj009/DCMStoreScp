@@ -5,7 +5,6 @@ import com.tqhy.dcm4che.Main;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.InputStreamReader;
-import java.net.URL;
 
 /**
  * 产生一个Dicom影像文件对应ImgCenter对象的任务
@@ -53,7 +52,7 @@ public class ImgCenterTask {
                         System.out.println(ImgCenterTask.class.getSimpleName() + " callPython complete... " + newImgPath);
                         return newImgPath;
                     } else {
-                        System.out.println(ImgCenterTask.class.getSimpleName() + " call Python fail...");
+                        System.out.println(ImgCenterTask.class.getSimpleName() + " run Python fail...");
                     }
                 }
                 in.close();
