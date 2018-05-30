@@ -45,12 +45,12 @@ public class MqClientUtils {
         }
     }
 
-    public void sendMessage(String msg) {
+    public void sendMessage(String msg, String queueName) {
         try {
             Destination destination; // MessageProducer：消息发送者
             MessageProducer producer; // TextMessage message;
             // 获取session注意参数值，须在在ActiveMq的console配置
-            destination = session.createQueue("img.dicom.queue");
+            destination = session.createQueue(queueName);
             // 得到消息生成者【发送者】
             producer = session.createProducer(destination);
             // 设置不持久化，此处学习，实际根据项目决定
