@@ -30,7 +30,7 @@ public class InitScuTask extends BaseTask {
 
     public BaseMsg call() {
         //访问后台接口获取初始化来源,部位,类型信息
-        System.out.println(getClass().getSimpleName() + " call() start...");
+        System.out.println(getClass().getSimpleName() + " run() start...");
         BaseMsg connMsg = getInitDataByOkHttp();
         //BaseMsg connMsg = fakeGetInitData();
         if (BaseMsg.SUCCESS == connMsg.getStatus()) {
@@ -64,21 +64,21 @@ public class InitScuTask extends BaseTask {
     }
 
     private InitScuMsg parseInitScuMsgFromJson(String msg) {
-        System.out.println("InitScuTask parseInitScuMsgFromJson() start: " +msg);
+        System.out.println("InitScuTask parseInitScuMsgFromJson() start: " + msg);
         JSONObject json = JSONObject.fromObject(msg);
         int status = json.getInt("status");
-        System.out.println("InitScuTask parseInitScuMsgFromJson() status: "+status);
+        System.out.println("InitScuTask parseInitScuMsgFromJson() status: " + status);
         String desc = json.getString("desc");
-        System.out.println("InitScuTask parseInitScuMsgFromJson() desc: "+desc);
-        InitScuMsg initScuMsg = new InitScuMsg(status,desc);
+        System.out.println("InitScuTask parseInitScuMsgFromJson() desc: " + desc);
+        InitScuMsg initScuMsg = new InitScuMsg(status, desc);
         JSONObject dataJson = json.getJSONObject("data");
         InitScuData initScuData = new InitScuData();
         List<String> part = parseJsonArray(dataJson, "part");
-        System.out.println("InitScuTask parseInitScuMsgFromJson() part: "+part);
+        System.out.println("InitScuTask parseInitScuMsgFromJson() part: " + part);
         List<String> source = parseJsonArray(dataJson, "source");
-        System.out.println("InitScuTask parseInitScuMsgFromJson() source: "+source);
+        System.out.println("InitScuTask parseInitScuMsgFromJson() source: " + source);
         List<String> type = parseJsonArray(dataJson, "type");
-        System.out.println("InitScuTask parseInitScuMsgFromJson() type: "+type);
+        System.out.println("InitScuTask parseInitScuMsgFromJson() type: " + type);
         initScuData.setPart(part);
         initScuData.setSource(source);
         initScuData.setType(type);
