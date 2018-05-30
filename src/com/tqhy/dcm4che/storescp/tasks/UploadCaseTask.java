@@ -52,7 +52,7 @@ public class UploadCaseTask extends BaseTask implements Callable<UploadCase> {
             }
 
             List<ImgCase> imgCases = uploadCase.getData();
-            //System.out.println(getClass().getSimpleName() + " call() uploadCase.getData(): " + imgCases.size());
+            //System.out.println(getClass().getSimpleName() + " run() uploadCase.getData(): " + imgCases.size());
             ImgCase aCase = null;
             boolean add = false;
             for (int i = 0; i < imgCases.size(); i++) {
