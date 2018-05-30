@@ -8,13 +8,14 @@ import com.tqhy.dcm4che.msg.ScuCommandMsg;
 import com.tqhy.dcm4che.storescp.configs.ConnectConfig;
 import com.tqhy.dcm4che.storescp.configs.StorageConfig;
 import com.tqhy.dcm4che.storescp.configs.TransferCapabilityConfig;
-import org.dcm4che3.net.service.BasicCStoreSCP;
 
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.net.Socket;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /**
  * @author Yiheng
@@ -64,7 +65,7 @@ public class MainTask implements Runnable {
                     case ScuCommandMsg.TRANSFER_ECXEL_REQUEST:
                         ExcelTask excelTask = new ExcelTask();
                         excelTask.setStream(in, out);
-                        excelTask.setSdConfig(sdConfig, assembledBatch);
+                        excelTask.init(sdConfig, assembledBatch, ScuCommandMsg.TRANSFER_ECXEL_READY);
                         List<ImgCase> imgCasesFromExcel = excelTask.call();
                         uploadCase = new UploadCase();
                         uploadCase.setData(imgCasesFromExcel);
@@ -75,6 +76,14 @@ public class MainTask implements Runnable {
                         initScuTask.setStream(in, out);
                         BaseMsg msg = initScuTask.call();
                         System.out.println("MainTask BaseTask.INIT_MSG_TO_SCU_TASK is done...msg status: " + msg.getStatus());
+                        break;
+                    case ScuCommandMsg.TRANSFER_JPG_REQUEST:
+                        JpgTask jpgTask = new JpgTask();
+                        jpgTask.setStream(in, out);
+                        jpgTask.init(sdConfig, assembledBatch, ScuCommandMsg.TRANSFER_JPG_READY);
+                        ExecutorService executorService = Executors.newSingleThreadExecutor();
+                        executorService.submit(jpgTask);
+                        flag = false;
                         break;
                     default:
                         System.out.println("MainTask ScuCommandMsg 为空");
