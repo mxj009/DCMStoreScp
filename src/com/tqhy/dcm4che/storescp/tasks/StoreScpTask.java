@@ -1,8 +1,6 @@
 package com.tqhy.dcm4che.storescp.tasks;
 
 import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-import com.google.gson.reflect.TypeToken;
 import com.tqhy.dcm4che.entity.AssembledBatch;
 import com.tqhy.dcm4che.entity.ImgCase;
 import com.tqhy.dcm4che.entity.UploadCase;
@@ -12,6 +10,7 @@ import com.tqhy.dcm4che.msg.UpLoadInfoMsg;
 import com.tqhy.dcm4che.storescp.configs.ConnectConfig;
 import com.tqhy.dcm4che.storescp.configs.StorageConfig;
 import com.tqhy.dcm4che.storescp.configs.TransferCapabilityConfig;
+import com.tqhy.dcm4che.storescp.utils.JsonUtils;
 import com.tqhy.dcm4che.storescp.utils.MqClientUtils;
 import com.tqhy.dcm4che.storescp.utils.StringUtils;
 import okhttp3.*;
@@ -30,7 +29,6 @@ import org.dcm4che3.util.SafeClose;
 
 import java.io.File;
 import java.io.IOException;
-import java.lang.reflect.Type;
 import java.security.GeneralSecurityException;
 import java.util.Iterator;
 import java.util.List;
@@ -243,12 +241,9 @@ public class StoreScpTask extends BaseTask {
      * @param uploadCase
      */
     private void uploadCasesByMq(UploadCase uploadCase) {
-        Type type = new TypeToken<UploadCase>() {
-        }.getType();
-        Gson gson = new GsonBuilder().serializeNulls().create();
-        String json = gson.toJson(uploadCase, type);
+        String json = JsonUtils.obj2Json(uploadCase, UploadCase.class);
         System.out.println(getClass().getSimpleName() + " uploadCasesByMq() json is: " + json);
-        MqClientUtils.getMqClient().sendMessage(json);
+        MqClientUtils.getMqClient().sendMessage(json, "img.dicom.queue");
     }
 
     /**
@@ -292,6 +287,7 @@ public class StoreScpTask extends BaseTask {
 
     /**
      * 向Device对象注册服务
+     *
      * @return
      */
     private DicomServiceRegistry createServiceRegistry() {
@@ -304,6 +300,7 @@ public class StoreScpTask extends BaseTask {
 
     /**
      * 设置存储根路径
+     *
      * @param storageDir 存储根路径
      */
     public void setStorageDirectory(File storageDir) {
@@ -314,10 +311,10 @@ public class StoreScpTask extends BaseTask {
     }
 
     public ConnConfigMsg call() {
-        //System.out.println(getClass().getSimpleName() + " call() start...");
+        //System.out.println(getClass().getSimpleName() + " run() start...");
         //System.out.println(getClass().getSimpleName() + " aeTitle: " + connectConfig.getAeTitle() + " hostName: " + connectConfig.getHost() + " port: " + connectConfig.getPort());
-        System.out.println(getClass().getSimpleName() + " call() Batch: " + assembledBatch.getBatch());
-        System.out.println(getClass().getSimpleName() + " call() thread: " + Thread.currentThread().getName());
+        System.out.println(getClass().getSimpleName() + " run() Batch: " + assembledBatch.getBatch());
+        System.out.println(getClass().getSimpleName() + " run() thread: " + Thread.currentThread().getName());
         configureConnect(conn, connectConfig);
         try {
             bindConnect(conn, ae, connectConfig);
@@ -409,6 +406,7 @@ public class StoreScpTask extends BaseTask {
 
     /**
      * 给ApplicationEntity绑定链接
+     *
      * @param conn
      * @param ae
      * @param connectConfig
