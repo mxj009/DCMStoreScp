@@ -80,6 +80,7 @@ public class MainTask implements Runnable {
                     case ScuCommandMsg.TRANSFER_JPG_REQUEST:
                         JpgTask jpgTask = new JpgTask();
                         jpgTask.setStream(in, out);
+                        jpgTask.setUploadCase(uploadCase);
                         jpgTask.init(sdConfig, assembledBatch, ScuCommandMsg.TRANSFER_JPG_READY);
                         ExecutorService executorService = Executors.newSingleThreadExecutor();
                         executorService.submit(jpgTask);
