@@ -74,6 +74,7 @@ public class ExcelTask extends FileTask {
                         }
                     }
                 }
+                aCase.setBatchNo(batch.getBatchNo());
                 imgCases.add(aCase);
             }
             return imgCases;
