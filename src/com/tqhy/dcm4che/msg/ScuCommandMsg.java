@@ -18,6 +18,8 @@ public class ScuCommandMsg extends BaseMsg{
     public static final int CREATE_BATCH_READY = 2008;
     public static final int TRANSFER_DICOM_REQUEST = 2009;
     public static final int TRANSFER_DICOM_READY = 2010;
+    public static final int TRANSFER_JPG_REQUEST = 2011;
+    public static final int TRANSFER_JPG_READY = 2012;
 
     public ScuCommandMsg(int status) {
         super(status);

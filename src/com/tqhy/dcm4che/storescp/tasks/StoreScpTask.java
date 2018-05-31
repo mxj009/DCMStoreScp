@@ -1,8 +1,6 @@
 package com.tqhy.dcm4che.storescp.tasks;
 
 import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-import com.google.gson.reflect.TypeToken;
 import com.tqhy.dcm4che.entity.AssembledBatch;
 import com.tqhy.dcm4che.entity.ImgCase;
 import com.tqhy.dcm4che.entity.UploadCase;
@@ -12,6 +10,7 @@ import com.tqhy.dcm4che.msg.UpLoadInfoMsg;
 import com.tqhy.dcm4che.storescp.configs.ConnectConfig;
 import com.tqhy.dcm4che.storescp.configs.StorageConfig;
 import com.tqhy.dcm4che.storescp.configs.TransferCapabilityConfig;
+import com.tqhy.dcm4che.storescp.utils.JsonUtils;
 import com.tqhy.dcm4che.storescp.utils.MqClientUtils;
 import com.tqhy.dcm4che.storescp.utils.StringUtils;
 import okhttp3.*;
@@ -30,7 +29,6 @@ import org.dcm4che3.util.SafeClose;
 
 import java.io.File;
 import java.io.IOException;
-import java.lang.reflect.Type;
 import java.security.GeneralSecurityException;
 import java.util.Iterator;
 import java.util.List;
@@ -158,12 +156,12 @@ public class StoreScpTask extends BaseTask {
     }
 
     /**
-     * 重命名文件,确保文件上传完成,上传完成后调用{@link StoreScpTask#parse(File)}方法对
+     * 重命名文件,确保文件上传完成,上传完成后调用{@link #parse(File)}方法对
      * 上传文件进行解析.
      *
      * @param from 待重命名文件
      * @param dest 重命名后文件
-     * @see StoreScpTask#parse(File)
+     * @see #parse(File)
      */
     private void renameTo(File from, File dest) {
         if (!dest.getParentFile().mkdirs()) {
@@ -182,14 +180,14 @@ public class StoreScpTask extends BaseTask {
 
     /**
      * 保存上传文件,该方法中保存的文件并非最终使用的DCM文件,而是<i>.part</i>结尾的临时文件;
-     * 调用该方法后,必须再调用{@link StoreScpTask#renameTo(File, File)}方法,以确保文件上传完成,
-     * 在进行其他操作,比如调用{@link StoreScpTask#parse(File)}进行DCM文件解析的操作.
+     * 调用该方法后,必须再调用{@link #renameTo(File, File)}方法,以确保文件上传完成,
+     * 在进行其他操作,比如调用{@link #parse(File)}进行DCM文件解析的操作.
      *
      * @param fmi  文件元信息
      * @param data PDV流数据
      * @param file 接收上传的临时文件
      * @throws IOException
-     * @see StoreScpTask#renameTo(File, File)
+     * @see #renameTo(File, File)
      */
     private void storeTo(Attributes fmi, PDVInputStream data, File file) throws IOException {
         file.getParentFile().mkdirs();
@@ -243,12 +241,9 @@ public class StoreScpTask extends BaseTask {
      * @param uploadCase
      */
     private void uploadCasesByMq(UploadCase uploadCase) {
-        Type type = new TypeToken<UploadCase>() {
-        }.getType();
-        Gson gson = new GsonBuilder().serializeNulls().create();
-        String json = gson.toJson(uploadCase, type);
+        String json = JsonUtils.obj2Json(uploadCase, UploadCase.class);
         System.out.println(getClass().getSimpleName() + " uploadCasesByMq() json is: " + json);
-        MqClientUtils.getMqClient().sendMessage(json);
+        MqClientUtils.getMqClient().sendMessage(json, "img.dicom.queue");
     }
 
     /**
@@ -280,18 +275,20 @@ public class StoreScpTask extends BaseTask {
      * 文件上传失败则删除临时文件
      *
      * @param file 要删除的临时文件
-     * @see StoreScpTask#parse(File)
+     * @see #parse(File)
      */
     private void deleteFile(File file) {
         if (file.delete()) {
             System.out.println(getClass().getSimpleName() + "delete file: " + file);
         } else {
-            System.out.println(getClass().getSimpleName() + "delete file failed: " + file);
+            System.gc();
+            System.out.println(getClass().getSimpleName() + "delete file " + file + " : " + file.delete());
         }
     }
 
     /**
      * 向Device对象注册服务
+     *
      * @return
      */
     private DicomServiceRegistry createServiceRegistry() {
@@ -304,6 +301,7 @@ public class StoreScpTask extends BaseTask {
 
     /**
      * 设置存储根路径
+     *
      * @param storageDir 存储根路径
      */
     public void setStorageDirectory(File storageDir) {
@@ -314,10 +312,10 @@ public class StoreScpTask extends BaseTask {
     }
 
     public ConnConfigMsg call() {
-        //System.out.println(getClass().getSimpleName() + " call() start...");
+        //System.out.println(getClass().getSimpleName() + " run() start...");
         //System.out.println(getClass().getSimpleName() + " aeTitle: " + connectConfig.getAeTitle() + " hostName: " + connectConfig.getHost() + " port: " + connectConfig.getPort());
-        System.out.println(getClass().getSimpleName() + " call() Batch: " + assembledBatch.getBatch());
-        System.out.println(getClass().getSimpleName() + " call() thread: " + Thread.currentThread().getName());
+        System.out.println(getClass().getSimpleName() + " run() Batch: " + assembledBatch.getBatch());
+        System.out.println(getClass().getSimpleName() + " run() thread: " + Thread.currentThread().getName());
         configureConnect(conn, connectConfig);
         try {
             bindConnect(conn, ae, connectConfig);
@@ -409,6 +407,7 @@ public class StoreScpTask extends BaseTask {
 
     /**
      * 给ApplicationEntity绑定链接
+     *
      * @param conn
      * @param ae
      * @param connectConfig

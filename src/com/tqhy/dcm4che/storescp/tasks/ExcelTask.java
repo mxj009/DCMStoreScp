@@ -1,21 +1,19 @@
 package com.tqhy.dcm4che.storescp.tasks;
 
-import com.tqhy.dcm4che.entity.AssembledBatch;
 import com.tqhy.dcm4che.entity.ImgCase;
-import com.tqhy.dcm4che.msg.ScuCommandMsg;
-import com.tqhy.dcm4che.storescp.configs.StorageConfig;
-import com.tqhy.dcm4che.storescp.utils.StringUtils;
 import org.apache.poi.hssf.usermodel.HSSFCell;
 import org.apache.poi.hssf.usermodel.HSSFRow;
 import org.apache.poi.hssf.usermodel.HSSFSheet;
 import org.apache.poi.hssf.usermodel.HSSFWorkbook;
 import org.apache.poi.ss.usermodel.CellType;
 
-import java.io.*;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.Callable;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -26,39 +24,12 @@ import java.util.regex.Pattern;
  * @create 2018/5/10
  * @since 1.0.0
  */
-public class ExcelTask extends BaseTask {
-
-    private File storeDir;
+public class ExcelTask extends FileTask {
 
     public List<ImgCase> call() {
-        ObjectOutputStream oos = null;
-        try {
-            oos = out;
-            ScuCommandMsg transReadyMsg = new ScuCommandMsg(1);
-            transReadyMsg.setCommand(ScuCommandMsg.TRANSFER_ECXEL_READY);
-            oos.writeObject(transReadyMsg);
-            oos.flush();
-
-            System.out.println("ExcelTask run...");
-
-            //获取文件名
-            String fname = (String) in.readObject();
-            System.out.println("ExcelTask excel fname is: " + fname);
-
-            File file = new File(storeDir, fname.trim());
-            File savedFile = saveExcel(file, in);
-            List<ImgCase> imgCases = parseExcel(savedFile);
-            return imgCases;
-        } catch (EOFException e) {
-
-        } catch (IOException e) {
-            e.printStackTrace();
-        } catch (Exception e) {
-            e.printStackTrace();
-        } finally {
-            releaseStream();
-        }
-        return null;
+        File savedFile = saveFile();
+        List<ImgCase> imgCases = parseExcel(savedFile);
+        return imgCases;
     }
 
     private List<ImgCase> parseExcel(File file) {
@@ -93,7 +64,6 @@ public class ExcelTask extends BaseTask {
                                     aCase.setImgInfo(value);
                                     break;
                                 case 2:
-
                                     aCase.setImgResult(value);
                                     break;
                                 case 3:
@@ -104,6 +74,7 @@ public class ExcelTask extends BaseTask {
                         }
                     }
                 }
+                aCase.setBatchNo(batch.getBatchNo());
                 imgCases.add(aCase);
             }
             return imgCases;
@@ -145,49 +116,4 @@ public class ExcelTask extends BaseTask {
         }
         return Double.parseDouble(format);
     }
-
-    private File saveExcel(File file, ObjectInputStream ois) {
-        System.out.println("ExcelTask will save excel to dir: " + file.getPath());
-        BufferedOutputStream bos = null;
-        try {
-            bos = new BufferedOutputStream(new FileOutputStream(file));
-            long fileLength = ois.readLong();
-
-            byte[] bytes = new byte[1024 * 8];
-            int len = 0;
-            while ((len = ois.read(bytes)) != -1 && file.length() < fileLength) {
-                System.out.println("ExcelTask writing excel..." + len);
-                System.out.println();
-                bos.write(bytes, 0, len);
-                bos.flush();
-                if (file.length() == fileLength) {
-                    System.out.println("upload excel complete...");
-                    bos.close();
-                    return file;
-                }
-            }
-
-
-        } catch (FileNotFoundException e) {
-            e.printStackTrace();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        return null;
-    }
-
-
-    public ExcelTask setSdConfig(StorageConfig sdConfig, AssembledBatch assembledBatch) {
-        String directory = sdConfig.getDirectory();
-        String batchNo = assembledBatch.getBatch().getBatchNo();
-        if (StringUtils.isNotEmpty(directory) && StringUtils.isNotEmpty(batchNo)) {
-            File storeDir = new File(directory, batchNo);
-            if (!storeDir.exists()) {
-                storeDir.mkdir();
-            }
-            this.storeDir = storeDir;
-        }
-        return this;
-    }
-
 }

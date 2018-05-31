@@ -67,6 +67,10 @@ public class Main extends Application {
     private Text tx_result;
 
     private Button bt_start;
+
+    /**
+     * jar包所在路径
+     */
     public static String rootPath;
 
     @Override
@@ -150,10 +154,16 @@ public class Main extends Application {
     }
 
     public static void main(String[] args) {
+        setRootPath();
+        launch(args);
+    }
+
+    private static void setRootPath() {
+        String osName = System.getProperty("os.name");
+        int begin = osName.toLowerCase().startsWith("win") ? 1 : 0;
         String jarPath = Main.class.getProtectionDomain().getCodeSource().getLocation().getFile();
         //System.out.println("file location is: " + jarPath);
         int end = jarPath.lastIndexOf("/");
-        rootPath = jarPath.substring(0, end);
-        launch(args);
+        rootPath = jarPath.substring(begin, end);
     }
 }
