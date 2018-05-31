@@ -156,12 +156,12 @@ public class StoreScpTask extends BaseTask {
     }
 
     /**
-     * 重命名文件,确保文件上传完成,上传完成后调用{@link StoreScpTask#parse(File)}方法对
+     * 重命名文件,确保文件上传完成,上传完成后调用{@link #parse(File)}方法对
      * 上传文件进行解析.
      *
      * @param from 待重命名文件
      * @param dest 重命名后文件
-     * @see StoreScpTask#parse(File)
+     * @see #parse(File)
      */
     private void renameTo(File from, File dest) {
         if (!dest.getParentFile().mkdirs()) {
@@ -180,14 +180,14 @@ public class StoreScpTask extends BaseTask {
 
     /**
      * 保存上传文件,该方法中保存的文件并非最终使用的DCM文件,而是<i>.part</i>结尾的临时文件;
-     * 调用该方法后,必须再调用{@link StoreScpTask#renameTo(File, File)}方法,以确保文件上传完成,
-     * 在进行其他操作,比如调用{@link StoreScpTask#parse(File)}进行DCM文件解析的操作.
+     * 调用该方法后,必须再调用{@link #renameTo(File, File)}方法,以确保文件上传完成,
+     * 在进行其他操作,比如调用{@link #parse(File)}进行DCM文件解析的操作.
      *
      * @param fmi  文件元信息
      * @param data PDV流数据
      * @param file 接收上传的临时文件
      * @throws IOException
-     * @see StoreScpTask#renameTo(File, File)
+     * @see #renameTo(File, File)
      */
     private void storeTo(Attributes fmi, PDVInputStream data, File file) throws IOException {
         file.getParentFile().mkdirs();
@@ -275,13 +275,14 @@ public class StoreScpTask extends BaseTask {
      * 文件上传失败则删除临时文件
      *
      * @param file 要删除的临时文件
-     * @see StoreScpTask#parse(File)
+     * @see #parse(File)
      */
     private void deleteFile(File file) {
         if (file.delete()) {
             System.out.println(getClass().getSimpleName() + "delete file: " + file);
         } else {
-            System.out.println(getClass().getSimpleName() + "delete file failed: " + file);
+            System.gc();
+            System.out.println(getClass().getSimpleName() + "delete file " + file + " : " + file.delete());
         }
     }
 
