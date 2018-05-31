@@ -7,7 +7,8 @@ import com.tqhy.dcm4che.entity.ImgCase;
 import com.tqhy.dcm4che.entity.ImgCenter;
 import com.tqhy.dcm4che.entity.UploadCase;
 import com.tqhy.dcm4che.storescp.constant.DicomTag;
-import com.tqhy.dcm4che.storescp.utils.MD5Utils;
+import com.tqhy.dcm4che.storescp.utils.FileUtils;
+import com.tqhy.dcm4che.storescp.utils.ImgCenterUtils;
 import com.tqhy.dcm4che.storescp.utils.StringUtils;
 import org.dcm4che3.io.DicomInputStream;
 import org.dcm4che3.json.JSONWriter;
@@ -39,6 +40,9 @@ public class UploadCaseTask extends BaseTask implements Callable<UploadCase> {
     public UploadCase call() {
         try {
             File jsonFile = dicom2Json(dcmFile);
+            if (null == jsonFile) {
+                return null;
+            }
             ImgCase newCase = Json2Object(jsonFile);
             //deleteFile(jsonFile);
             newCase = generateImgCenter(dcmFile, newCase);
@@ -96,19 +100,19 @@ public class UploadCaseTask extends BaseTask implements Callable<UploadCase> {
         ArrayList<ImgCenter> imgCenters = new ArrayList<>();
         ImgCenter imgCenter = new ImgCenter();
         //设置图像地址
-        String imgUrl = ImgCenterTask.getImgUrl(dcmFile);
+        String imgUrl = ImgCenterUtils.getImgUrlOfDcm(dcmFile);
         if (null != imgUrl) {
             imgCenter.setImgUrl(imgUrl);
             //设置1024图像地址
-            String img1024Url = ImgCenterTask.getImg1024Url(new File(imgUrl));
+            String img1024Url = ImgCenterUtils.getImg1024Url(new File(imgUrl));
             imgCenter.setImg1024Url(img1024Url);
             //设置缩略图地址
-            String imgUrlThumb = ImgCenterTask.getImgUrlThumb(new File(imgUrl));
+            String imgUrlThumb = ImgCenterUtils.getImgUrlThumb(new File(imgUrl));
             imgCenter.setImgUrlThumb(imgUrlThumb);
         }
 
         //设置MD5值
-        String md5 = MD5Utils.getMD5(dcmFile);
+        String md5 = FileUtils.getMD5(dcmFile);
         imgCenter.setImgMd5(md5);
         //设置批次号
         imgCenter.setBatchNo(assembledBatch.getBatch().getBatchNo());
