@@ -98,4 +98,20 @@ public class FileTask extends BaseTask {
     public String getTarget() {
         return target;
     }
+
+    public void setScuCommand(int scuCommand) {
+        this.scuCommand = scuCommand;
+    }
+
+    public void setStoreDir(File storeDir) {
+        this.storeDir = storeDir;
+    }
+
+    public void setBatch(Batch batch) {
+        this.batch = batch;
+    }
+
+    public void setTarget(String target) {
+        this.target = target;
+    }
 }
