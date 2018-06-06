@@ -34,11 +34,11 @@ public class FileTask extends BaseTask {
             out.writeObject(transReadyMsg);
             out.flush();
 
-            System.out.println(getClass().getSimpleName() + " run...");
+            System.out.println(getClass().getSimpleName() + this + " run...");
 
             //获取文件名
             String fname = (String) in.readObject();
-            System.out.println(getClass().getSimpleName() + " file is: " + fname);
+            System.out.println(getClass().getSimpleName() + this + " file is: " + fname);
 
             //获取文件长度
             long fileLength = in.readLong();
@@ -46,18 +46,18 @@ public class FileTask extends BaseTask {
             target = (String) in.readObject();
 
             File file = new File(storeDir, fname.trim());
-            System.out.println(getClass().getSimpleName() + " will save file to dir: " + file.getPath());
+            System.out.println(getClass().getSimpleName() + this + " will save file to dir: " + file.getPath());
             BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream(file));
 
             byte[] bytes = new byte[1024 * 8];
             int len = 0;
             while ((len = in.read(bytes)) != -1 && file.length() < fileLength) {
-                System.out.println(getClass().getSimpleName() + " writing file..." + len);
+                System.out.println(getClass().getSimpleName() + this + " writing file..." + len);
                 System.out.println();
                 bos.write(bytes, 0, len);
                 bos.flush();
                 if (file.length() == fileLength) {
-                    System.out.println(getClass().getSimpleName() + "upload file complete...");
+                    System.out.println(getClass().getSimpleName() + this + "upload file complete...");
                     bos.close();
                     return file;
                 }
