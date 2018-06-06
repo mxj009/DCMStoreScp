@@ -18,7 +18,8 @@ public class ImgCenterUtils {
 
     public static String getImgUrlOfDcm(File dicomFile) {
         System.out.println(ImgCenterUtils.class.getSimpleName() + " getImgUrlOfDcm...");
-        File jpgFile = Dcm2JpgTask.getInstance().convert(dicomFile);
+        Dcm2JpgTask dcm2JpgTask = new Dcm2JpgTask();
+        File jpgFile = dcm2JpgTask.convert(dicomFile);
         if (null != jpgFile && jpgFile.exists()) {
             return jpgFile.getPath();
         }
