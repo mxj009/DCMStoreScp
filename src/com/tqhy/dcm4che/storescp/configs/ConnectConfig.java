@@ -2,6 +2,7 @@ package com.tqhy.dcm4che.storescp.configs;
 
 import com.tqhy.dcm4che.msg.ConnConfigMsg;
 import com.tqhy.dcm4che.storescp.utils.StringUtils;
+import org.dcm4che3.net.Connection;
 
 /**
  * @author Yiheng
@@ -34,6 +35,7 @@ public class ConnectConfig {
     private boolean notAsync;
     private boolean notPackPdv;
     private boolean notTcpDelay;
+    private Connection conn;
 
     public ConnConfigMsg init(String aeAtHostPort) {
         //[<aet>[@<ip>]:]<port>
@@ -53,7 +55,7 @@ public class ConnectConfig {
                     return initHostPort(hostPort);
                 }
             }
-            return new ConnConfigMsg(ConnConfigMsg.CONFIG_FAIL,ConnConfigMsg.CONFIG_FORMAT_NOT_RIGHT);
+            return new ConnConfigMsg(ConnConfigMsg.CONFIG_FAIL, ConnConfigMsg.CONFIG_FORMAT_NOT_RIGHT);
         }
         return new ConnConfigMsg(ConnConfigMsg.CONFIG_FAIL, ConnConfigMsg.CONFIG_IS_NULL);
     }
@@ -64,7 +66,7 @@ public class ConnectConfig {
             return new ConnConfigMsg(ConnConfigMsg.CONFIG_SUCCESS);
         } catch (NumberFormatException e) {
             e.printStackTrace();
-            return new ConnConfigMsg(ConnConfigMsg.CONFIG_FAIL,ConnConfigMsg.PORT_NOT_NUMBER_ERROR);
+            return new ConnConfigMsg(ConnConfigMsg.CONFIG_FAIL, ConnConfigMsg.PORT_NOT_NUMBER_ERROR);
         }
     }
 
@@ -75,6 +77,32 @@ public class ConnectConfig {
         this.host = host;
         this.aeTitle = aeTitle;
         this.port = port;
+    }
+
+    public Connection getConn() {
+        return conn;
+    }
+
+    public void setConn(Connection conn) {
+        conn.setPort(port);
+        conn.setHostname(host);
+        conn.setReceivePDULength(Connection.DEF_MAX_PDU_LENGTH);
+        conn.setSendPDULength(Connection.DEF_MAX_PDU_LENGTH);
+        conn.setMaxOpsInvoked(0);
+        conn.setMaxOpsPerformed(0);
+        conn.setPackPDV(true);
+        conn.setConnectTimeout(0);
+        conn.setRequestTimeout(0);
+        conn.setAcceptTimeout(0);
+        conn.setReleaseTimeout(0);
+        conn.setResponseTimeout(0);
+        conn.setRetrieveTimeout(0);
+        conn.setIdleTimeout(0);
+        conn.setSocketCloseDelay(Connection.DEF_SOCKETDELAY);
+        conn.setSendBufferSize(0);
+        conn.setReceiveBufferSize(0);
+        conn.setTcpNoDelay(true);
+        this.conn = conn;
     }
 
     public String getHost() {
