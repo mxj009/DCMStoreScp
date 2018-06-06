@@ -37,16 +37,22 @@ public class JpgTask extends FileTask implements Runnable {
                 //装配UploadCase
                 List<ImgCase> originImgCases = uploadCase.getData();
                 System.out.println("originImgCases.size()..1" + originImgCases.size());
-                List<ImgCase> assembledImgCases = new ArrayList<>();
-                for (String path : jpgPaths) {
-                    String patientId = FileUtils.getFileNameWithoutSuffix(path);
-                    assembleImgCase(patientId, path, originImgCases, assembledImgCases);
+                if (0 == originImgCases.size()) {
+                    for (String path : jpgPaths) {
+                        assembleImgCaseFromNew(originImgCases, path);
+                    }
+                } else {
+                    List<ImgCase> assembledImgCases = new ArrayList<>();
+                    for (String path : jpgPaths) {
+                        String patientId = FileUtils.getFileNameWithoutSuffix(path);
+                        assembleImgCaseFromOrigin(patientId, path, originImgCases, assembledImgCases);
+                    }
+                    System.out.println("originImgCases.size()..2" + originImgCases.size());
+                    if (originImgCases.size() > 0) {
+                        assembledImgCases.addAll(originImgCases);
+                    }
+                    uploadCase.setData(assembledImgCases);
                 }
-                System.out.println("originImgCases.size()..2" + originImgCases.size());
-                if (originImgCases.size() > 0) {
-                    assembledImgCases.addAll(originImgCases);
-                }
-                uploadCase.setData(assembledImgCases);
                 json = JsonUtils.obj2Json(uploadCase);
             }
             System.out.println("JpgTask send json: " + json);
@@ -62,7 +68,37 @@ public class JpgTask extends FileTask implements Runnable {
         }
     }
 
-    private void assembleImgCase(String patientId, String path, List<ImgCase> originImgCases, List<ImgCase> assembledImgCases) {
+    /**
+     * 对应未上传Excel文件情况,originImgCases集合中病例数为0,则全部由jpg文件生成病例
+     * 对象,然后放入originImgCases.
+     *
+     * @param originImgCases
+     * @param path
+     */
+    private void assembleImgCaseFromNew(List<ImgCase> originImgCases, String path) {
+        ImgCase imgCase = new ImgCase();
+        imgCase.setBatchNo(batch.getBatchNo());
+        String patientId = FileUtils.getFileNameWithoutSuffix(path);
+        imgCase.setPatientId(patientId);
+        File jpgFile = new File(path);
+        List<ImgCenter> imgCenters = makeImgCenters(path, jpgFile);
+        imgCase.setImgCenters(imgCenters);
+        originImgCases.add(imgCase);
+    }
+
+    /**
+     * 对应有上传Excel文件情况,此时originImgCases不为空,其中病例对象来自对Excel文件
+     * 内容的解析,在该方法中需要将这些病例对象与Jpg图片patientId比对,比对成功则基于Jpg图片
+     * 创建ImgCenter对象,并添加到ImgCase对象的imgCenters集合中,最后将该ImgCase对象置入
+     * assembledImgCase集合中;如果遍历完仍未匹配成功,则添加两个ImgCase,一个来自Excel,一
+     * 个来自jpg图片.
+     *
+     * @param patientId
+     * @param path
+     * @param originImgCases
+     * @param assembledImgCases
+     */
+    private void assembleImgCaseFromOrigin(String patientId, String path, List<ImgCase> originImgCases, List<ImgCase> assembledImgCases) {
         File jpgFile = new File(path);
         int count = 0;
         for (ImgCase aCase : originImgCases) {
@@ -84,6 +120,13 @@ public class JpgTask extends FileTask implements Runnable {
         }
     }
 
+    /**
+     * 创建ImgCenters对象
+     *
+     * @param path    jpg文件路径
+     * @param jpgFile jpg文件对象
+     * @return ImgCenter对象集合
+     */
     private List<ImgCenter> makeImgCenters(String path, File jpgFile) {
         ImgCenter imgCenter = new ImgCenter();
         List<ImgCenter> imgCenters = new ArrayList<>();
@@ -97,6 +140,10 @@ public class JpgTask extends FileTask implements Runnable {
     }
 
     public void setUploadCase(UploadCase uploadCase) {
+        if (null == uploadCase) {
+            uploadCase = new UploadCase();
+            uploadCase.setData(new ArrayList<ImgCase>());
+        }
         this.uploadCase = uploadCase;
     }
 }

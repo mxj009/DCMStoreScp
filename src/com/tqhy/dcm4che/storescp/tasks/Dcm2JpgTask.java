@@ -21,8 +21,6 @@ import java.util.Iterator;
  * @since 1.0.0
  */
 public class Dcm2JpgTask {
-
-    private static Dcm2JpgTask instance = new Dcm2JpgTask();
     private int windowIndex;
     private int voiLUTIndex;
     private float windowWidth;
@@ -108,11 +106,8 @@ public class Dcm2JpgTask {
         return param;
     }
 
-    private Dcm2JpgTask() {
+    public Dcm2JpgTask() {
         initImageWriter();
     }
 
-    public static Dcm2JpgTask getInstance() {
-        return instance;
-    }
 }

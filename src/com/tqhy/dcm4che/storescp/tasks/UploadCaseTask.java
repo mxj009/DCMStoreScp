@@ -21,7 +21,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.Callable;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -30,13 +29,12 @@ import java.util.regex.Pattern;
  * @create 2018/5/15
  * @since 1.0.0
  */
-public class UploadCaseTask extends BaseTask implements Callable<UploadCase> {
+public class UploadCaseTask extends BaseTask {
 
     private AssembledBatch assembledBatch;
     private File dcmFile;
     private UploadCase uploadCase;
 
-    @Override
     public UploadCase call() {
         try {
             File jsonFile = dicom2Json(dcmFile);
@@ -51,7 +49,9 @@ public class UploadCaseTask extends BaseTask implements Callable<UploadCase> {
             if (null == uploadCase) {
                 uploadCase = new UploadCase();
                 uploadCase.setBatch(assembledBatch.getBatch());
-                uploadCase.getData().add(newCase);
+                List<ImgCase> imgCases = new ArrayList<>();
+                imgCases.add(newCase);
+                uploadCase.setData(imgCases);
                 return uploadCase;
             }
 

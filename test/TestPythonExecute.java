@@ -49,7 +49,8 @@ public class TestPythonExecute {
     public void testDcm2Jpg() {
         String dicomPath = "C:/Users/qing/Desktop/dcm_pics/IMG00001";
         File dicomFile = new File(dicomPath);
-        File jpgFile = Dcm2JpgTask.getInstance().convert(dicomFile);
+        Dcm2JpgTask dcm2JpgTask = new Dcm2JpgTask();
+        File jpgFile = dcm2JpgTask.convert(dicomFile);
         System.out.println(null == jpgFile ? "fail" : jpgFile.getAbsolutePath());
     }
 

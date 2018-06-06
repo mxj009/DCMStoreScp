@@ -7,15 +7,20 @@ import com.tqhy.dcm4che.msg.BaseMsg;
 import com.tqhy.dcm4che.msg.ScuCommandMsg;
 import com.tqhy.dcm4che.storescp.configs.ConnectConfig;
 import com.tqhy.dcm4che.storescp.configs.StorageConfig;
-import com.tqhy.dcm4che.storescp.configs.TransferCapabilityConfig;
+import org.dcm4che3.net.Connection;
+import org.dcm4che3.net.Device;
+import org.dcm4che3.net.service.BasicCEchoSCP;
+import org.dcm4che3.net.service.DicomServiceRegistry;
 
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.net.Socket;
+import java.security.GeneralSecurityException;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 
 /**
  * @author Yiheng
@@ -24,10 +29,12 @@ import java.util.concurrent.Executors;
  */
 public class MainTask implements Runnable {
     private final Socket socket;
+    private Device device;
     private AssembledBatch assembledBatch;
     private UploadCase uploadCase;
-    private ConnectConfig connConfig;
-    private StorageConfig sdConfig;
+    private ConnectConfig connectConfig;
+    private StorageConfig storageConfig;
+    private Connection conn;
 
     @Override
     public void run() {
@@ -45,15 +52,10 @@ public class MainTask implements Runnable {
                 System.out.println("MainTask buildServerSocket command is: " + command);
                 switch (command) {
                     case ScuCommandMsg.TRANSFER_DICOM_REQUEST:
-                        StoreScpTask storeScpTask = new StoreScpTask();
-                        storeScpTask.setConnectConfig(connConfig);
-                        storeScpTask.setTcConfig(new TransferCapabilityConfig());
-                        storeScpTask.setSdConfig(sdConfig);
+                        StoreScpTask storeScpTask = new StoreScpTask(connectConfig, storageConfig, uploadCase, assembledBatch);
                         storeScpTask.setStream(in, out);
-                        storeScpTask.setUploadCase(uploadCase);
-                        storeScpTask.setAssembledBatch(assembledBatch);
                         System.out.println(getClass().getSimpleName() + " TRANSFER_DICOM_REQUEST ..." + assembledBatch.getBatch());
-                        storeScpTask.call();
+                        storeScpTask.call(device);
                         flag = false;
                         break;
                     case ScuCommandMsg.CREATE_BATCH_REQUEST:
@@ -61,11 +63,12 @@ public class MainTask implements Runnable {
                         batchTask.setStream(in, out);
                         assembledBatch = batchTask.call();
                         System.out.println(getClass().getSimpleName() + " CREATE_BATCH_REQUEST ..." + assembledBatch.getBatch());
+                        initDeviceConnection();
                         break;
                     case ScuCommandMsg.TRANSFER_ECXEL_REQUEST:
                         ExcelTask excelTask = new ExcelTask();
                         excelTask.setStream(in, out);
-                        excelTask.init(sdConfig, assembledBatch, ScuCommandMsg.TRANSFER_ECXEL_READY);
+                        excelTask.init(storageConfig, assembledBatch, ScuCommandMsg.TRANSFER_ECXEL_READY);
                         List<ImgCase> imgCasesFromExcel = excelTask.call();
                         uploadCase = new UploadCase();
                         uploadCase.setData(imgCasesFromExcel);
@@ -81,7 +84,7 @@ public class MainTask implements Runnable {
                         JpgTask jpgTask = new JpgTask();
                         jpgTask.setStream(in, out);
                         jpgTask.setUploadCase(uploadCase);
-                        jpgTask.init(sdConfig, assembledBatch, ScuCommandMsg.TRANSFER_JPG_READY);
+                        jpgTask.init(storageConfig, assembledBatch, ScuCommandMsg.TRANSFER_JPG_READY);
                         ExecutorService executorService = Executors.newSingleThreadExecutor();
                         executorService.submit(jpgTask);
                         flag = false;
@@ -98,10 +101,39 @@ public class MainTask implements Runnable {
         }
     }
 
-    public MainTask(Socket socket, ConnectConfig connConfig, StorageConfig sdConfig) {
+    /**
+     * 初始化Device配置
+     */
+    private void initDeviceConnection() {
+        this.connectConfig = new ConnectConfig();
+        connectConfig.init(assembledBatch.getAeAtHostPort());
+        device = new Device(assembledBatch.getBatch().getBatchNo());
+        ExecutorService pool = Executors.newCachedThreadPool();
+        ScheduledExecutorService scheduledExecutorService = Executors.newSingleThreadScheduledExecutor();
+        device.setScheduledExecutor(scheduledExecutorService);
+        device.setExecutor(pool);
+
+        conn = new Connection();
+        conn.setHostname(connectConfig.getHost());
+        int port = connectConfig.getPort();
+        conn.setPort(port == 0 ? ConnectConfig.DEFAULT_PORT : port);
+        device.addConnection(conn);
+        connectConfig.setConn(conn);
+        try {
+            device.bindConnections();
+        } catch (IOException e) {
+            e.printStackTrace();
+        } catch (GeneralSecurityException e) {
+            e.printStackTrace();
+        }
+        DicomServiceRegistry serviceRegistry = new DicomServiceRegistry();
+        serviceRegistry.addDicomService(new BasicCEchoSCP());
+        device.setDimseRQHandler(serviceRegistry);
+    }
+
+    public MainTask(Socket socket, StorageConfig storageConfig) {
         this.socket = socket;
-        this.connConfig = connConfig;
-        this.sdConfig = sdConfig;
+        this.storageConfig = storageConfig;
     }
 
 }

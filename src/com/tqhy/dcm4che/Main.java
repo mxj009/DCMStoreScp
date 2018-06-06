@@ -1,7 +1,5 @@
 package com.tqhy.dcm4che;
 
-import com.tqhy.dcm4che.msg.ConnConfigMsg;
-import com.tqhy.dcm4che.storescp.configs.ConnectConfig;
 import com.tqhy.dcm4che.storescp.configs.StorageConfig;
 import com.tqhy.dcm4che.storescp.tasks.MainTask;
 import javafx.application.Application;
@@ -9,9 +7,6 @@ import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
-import javafx.scene.control.Label;
-import javafx.scene.control.TextField;
-import javafx.scene.control.Tooltip;
 import javafx.scene.image.Image;
 import javafx.scene.layout.GridPane;
 import javafx.scene.paint.Color;
@@ -41,15 +36,6 @@ public class Main extends Application {
      */
     private Scene scene;
 
-    /**
-     * 设置本地链接提示
-     */
-    private Label lb_conn;
-
-    /**
-     * 设置本地连接输入框
-     */
-    private TextField tf_conn;
 
     /**
      * 选择存储路径按钮
@@ -82,13 +68,6 @@ public class Main extends Application {
         root.setPadding(new Insets(25, 25, 25, 25));
         //root.setGridLinesVisible(true);
 
-        lb_conn = new Label("设置连接:");
-        root.add(lb_conn, 0, 0);
-
-        tf_conn = new TextField();
-        tf_conn.setTooltip(new Tooltip("格式:[<aet>[@<ip>]:]<port>"));
-        root.add(tf_conn, 1, 0);
-
         bt_store = new Button("选择保存路径:");
         bt_store.setOnAction(event -> {
             DirectoryChooser directoryChooser = new DirectoryChooser();
@@ -97,23 +76,13 @@ public class Main extends Application {
             tx_store.setText(file.getAbsolutePath());
             System.out.println("Main select storage path: " + file.getAbsolutePath());
         });
-        root.add(bt_store, 0, 1);
+        root.add(bt_store, 0, 0);
         tx_store = new Text();
-        root.add(tx_store, 1, 1);
+        root.add(tx_store, 0, 1);
 
         bt_start = new Button("开启服务");
         bt_start.setOnAction(event -> {
-            ConnectConfig connConfig = new ConnectConfig();
-            String aeAtHostPort = tf_conn.getText().trim();
-            ConnConfigMsg configMsg = connConfig.init(aeAtHostPort);
-            tx_result.setText(configMsg.getDesc());
-            if (ConnConfigMsg.CONFIG_SUCCESS == configMsg.getStatus()) {
-                buildServerSocket(connConfig);
-            } else {
-                return;
-            }
-
-
+            buildServerSocket();
         });
         root.add(bt_start, 0, 8);
 
@@ -132,11 +101,10 @@ public class Main extends Application {
         });
     }
 
-    private void buildServerSocket(ConnectConfig connConfig) {
-
+    private void buildServerSocket() {
         new Thread(() -> {
             try {
-                ServerSocket serverSocket = new ServerSocket(connConfig.getPort() + 1);
+                ServerSocket serverSocket = new ServerSocket(11113);
                 Socket socket = null;
                 ExecutorService pool = Executors.newCachedThreadPool();
                 while (true) {
@@ -144,7 +112,8 @@ public class Main extends Application {
                     System.out.println(getClass().getSimpleName() + " buildServerSocket() accept socket: " + socket);
                     StorageConfig sdConfig = new StorageConfig();
                     sdConfig.setDirectory(tx_store.getText().trim());
-                    MainTask mainTask = new MainTask(socket, connConfig, sdConfig);
+                    //Device device = initDevice(connectConfig);
+                    MainTask mainTask = new MainTask(socket, sdConfig);
                     pool.submit(mainTask);
                 }
             } catch (IOException e) {
@@ -152,6 +121,7 @@ public class Main extends Application {
             }
         }).start();
     }
+
 
     public static void main(String[] args) {
         setRootPath();

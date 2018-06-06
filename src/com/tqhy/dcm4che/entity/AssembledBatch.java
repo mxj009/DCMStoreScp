@@ -3,15 +3,15 @@ package com.tqhy.dcm4che.entity;
 import java.io.Serializable;
 
 /**
- *
  * 上传文件前上传批次信息实体类,包括一个Batch对象,一条Part信息,一条Source信息以及一条Type信息
  *
  * @author Yiheng
  * @create 2018/5/16
  * @since 1.0.0
  */
-public class AssembledBatch implements Serializable{
+public class AssembledBatch implements Serializable {
     private static final long serialVersionUID = 1L;
+    private String aeAtHostPort;
     private Batch batch;
     private String type;
     private String part;
@@ -25,6 +25,14 @@ public class AssembledBatch implements Serializable{
         this.type = type;
         this.part = part;
         this.source = source;
+    }
+
+    public String getAeAtHostPort() {
+        return aeAtHostPort;
+    }
+
+    public void setAeAtHostPort(String aeAtHostPort) {
+        this.aeAtHostPort = aeAtHostPort;
     }
 
     public Batch getBatch() {

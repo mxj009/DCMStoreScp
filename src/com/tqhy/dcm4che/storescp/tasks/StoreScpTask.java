@@ -29,11 +29,9 @@ import org.dcm4che3.util.SafeClose;
 
 import java.io.File;
 import java.io.IOException;
-import java.security.GeneralSecurityException;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Properties;
-import java.util.concurrent.*;
 
 /**
  * 文件上传服务端,文件接收
@@ -45,19 +43,9 @@ import java.util.concurrent.*;
 public class StoreScpTask extends BaseTask {
 
     /**
-     * ApplicationEntity容器,除Connection外,均采用默认配置
-     */
-    private Device device;
-
-    /**
      * 除Connection与title外,均采用默认配置
      */
     private ApplicationEntity ae;
-
-    /**
-     * DCM Connecttion对象,由{@link ConnectConfig}完成初始化
-     */
-    private Connection conn;
 
     /**
      * 文件存储根路径,由{@link StorageConfig}完成初始化
@@ -82,7 +70,7 @@ public class StoreScpTask extends BaseTask {
     /**
      * 存储路径及方式配置
      */
-    private StorageConfig sdConfig;
+    private StorageConfig storageConfig;
 
     /**
      * Excel解析出来的UploadCase集合
@@ -114,7 +102,13 @@ public class StoreScpTask extends BaseTask {
      */
     private BasicCStoreSCP cstoreSCP;
 
-    public StoreScpTask() {
+    public StoreScpTask(ConnectConfig connectConfig, StorageConfig storageConfig, UploadCase uploadCase, AssembledBatch assembledBatch) {
+        setConnectConfig(connectConfig);
+        setStorageConfig(storageConfig);
+        setUploadCase(uploadCase);
+        setAssembledBatch(assembledBatch);
+        setAe(connectConfig);
+        setTcConfig(new TransferCapabilityConfig());
         cstoreSCP = new BasicCStoreSCP(new String[]{"*"}) {
             protected void store(Association as, PresentationContext pc, Attributes rq, PDVInputStream data, Attributes rsp) throws IOException {
                 rsp.setInt(2304, VR.US, new int[]{status});
@@ -124,8 +118,8 @@ public class StoreScpTask extends BaseTask {
                     String iuid = rq.getString(4096);
                     String tsuid = pc.getTransferSyntax();
 
-                    System.out.println("StoreScpTask store() batch..." + assembledBatch.getBatch());
-                    System.out.println("StoreScpTask store() thread..." + Thread.currentThread().getName());
+                    System.out.println(this + " StoreScpTask store() batch..." + assembledBatch.getBatch());
+                    System.out.println(this + " StoreScpTask store() thread..." + Thread.currentThread().getName());
                     File storeDir = new File(storageDir, assembledBatch.getBatch().getBatchNo());
                     if (!storeDir.exists()) {
                         storeDir.mkdir();
@@ -143,16 +137,6 @@ public class StoreScpTask extends BaseTask {
                 }
             }
         };
-        conn = new Connection();
-        ae = new ApplicationEntity("*");
-        ae.setAssociationAcceptor(true);
-        ae.addConnection(conn);
-
-        device = new Device("storescp");
-        DicomServiceRegistry serviceRegistry = createServiceRegistry();
-        device.setDimseRQHandler(serviceRegistry);
-        device.addConnection(conn);
-        device.addApplicationEntity(ae);
     }
 
     /**
@@ -210,28 +194,15 @@ public class StoreScpTask extends BaseTask {
      */
     private void parse(File file) {
         UploadCaseTask uploadCaseTask = new UploadCaseTask(file, uploadCase, assembledBatch);
-        ExecutorService executor = Executors.newSingleThreadExecutor();
-        Future<UploadCase> uploadCaseFuture = executor.submit(uploadCaseTask);
-        try {
-            uploadCase = uploadCaseFuture.get();
-            System.out.println("StoreScpTask parse() uploadCase is: " + uploadCase);
-            parsedFileCount++;
-            if (parsedFileCount == dicomFileCount) {
-                //已经处理完毕所有上传文件
-                //uploadCasesByHttp(uploadCase);
-                uploadCasesByMq(uploadCase);
-                parsedFileCount = 0;
-                device.unbindConnections();
-                device.reconfigure(new Device());
-            }
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        } catch (ExecutionException e) {
-            e.printStackTrace();
-        } catch (GeneralSecurityException e) {
-            e.printStackTrace();
-        } catch (IOException e) {
-            e.printStackTrace();
+        uploadCase = uploadCaseTask.call();
+        System.out.println(this.cstoreSCP + " StoreScpTask parse() uploadCase is: " + uploadCase);
+        parsedFileCount++;
+        if (parsedFileCount == dicomFileCount) {
+            //已经处理完毕所有上传文件
+            //uploadCasesByHttp(uploadCase);
+            uploadCasesByMq(uploadCase);
+            parsedFileCount = 0;
+
         }
     }
 
@@ -244,6 +215,21 @@ public class StoreScpTask extends BaseTask {
         String json = JsonUtils.obj2Json(uploadCase, UploadCase.class);
         System.out.println(getClass().getSimpleName() + " uploadCasesByMq() json is: " + json);
         MqClientUtils.getMqClient().sendMessage(json, "img.dicom.queue");
+        releaseResources();
+    }
+
+    private void releaseResources() {
+        Device device = ae.getDevice();
+        device.unbindConnections();
+        List<Connection> conns = ae.getConnections();
+        Iterator<Connection> iterator = conns.iterator();
+        while (iterator.hasNext()) {
+            Connection conn = iterator.next();
+            conn.unbind();
+            //ae.removeConnection(conn);
+        }
+        device = null;
+        ae = null;
     }
 
     /**
@@ -311,21 +297,15 @@ public class StoreScpTask extends BaseTask {
         this.storageDir = storageDir;
     }
 
-    public ConnConfigMsg call() {
+    public ConnConfigMsg call(Device device) {
         //System.out.println(getClass().getSimpleName() + " run() start...");
         //System.out.println(getClass().getSimpleName() + " aeTitle: " + connectConfig.getAeTitle() + " hostName: " + connectConfig.getHost() + " port: " + connectConfig.getPort());
         System.out.println(getClass().getSimpleName() + " run() Batch: " + assembledBatch.getBatch());
         System.out.println(getClass().getSimpleName() + " run() thread: " + Thread.currentThread().getName());
-        configureConnect(conn, connectConfig);
         try {
-            bindConnect(conn, ae, connectConfig);
-            configureTransferCapability(ae, tcConfig);
-            configureStorageDirectory(sdConfig);
-            ExecutorService pool = Executors.newCachedThreadPool();
-            ScheduledExecutorService scheduledExecutorService = Executors.newSingleThreadScheduledExecutor();
-            device.setScheduledExecutor(scheduledExecutorService);
-            device.setExecutor(pool);
-            device.bindConnections();
+            configureTransferCapability();
+            configureStorageDirectory();
+            configureDevice(device);
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -348,72 +328,19 @@ public class StoreScpTask extends BaseTask {
         return null;
     }
 
-    /**
-     * 配置连接
-     *
-     * @param conn          连接对象
-     * @param connectConfig 如果为null,则new一个新对象,所有配置将采用默认配置
-     */
-    private void configureConnect(Connection conn, ConnectConfig connectConfig) {
-        if (null == connectConfig) {
-            connectConfig = new ConnectConfig();
-        }
-        int maxPdulenRcv = connectConfig.getMaxPdulenRcv();
-        conn.setReceivePDULength(maxPdulenRcv > 0 ? maxPdulenRcv : Connection.DEF_MAX_PDU_LENGTH);
-
-        int maxPdulenSnd = connectConfig.getMaxPdulenSnd();
-        conn.setSendPDULength(maxPdulenSnd > 0 ? maxPdulenSnd : Connection.DEF_MAX_PDU_LENGTH);
-
-        int maxOpsInvoked = connectConfig.getMaxOpsInvoked();
-        conn.setMaxOpsInvoked(connectConfig.isNotAsync() ? 1 : (maxOpsInvoked > 0 ? maxOpsInvoked : 0));
-
-        int maxOpsPerformed = connectConfig.getMaxOpsPerformed();
-        conn.setMaxOpsPerformed(connectConfig.isNotAsync() ? 1 : (maxOpsPerformed > 0 ? maxOpsPerformed : 0));
-
-        conn.setPackPDV(!connectConfig.isNotPackPdv());
-
-        int connectTimeout = connectConfig.getConnectTimeout();
-        conn.setConnectTimeout(connectTimeout > 0 ? maxOpsPerformed : 0);
-
-        int requestTimeout = connectConfig.getRequestTimeout();
-        conn.setRequestTimeout(requestTimeout > 0 ? requestTimeout : 0);
-
-        int acceptTimeout = connectConfig.getAcceptTimeout();
-        conn.setAcceptTimeout(acceptTimeout > 0 ? acceptTimeout : 0);
-
-        int releaseTimeout = connectConfig.getReleaseTimeout();
-        conn.setReleaseTimeout(releaseTimeout > 0 ? releaseTimeout : 0);
-
-        int responseTimeout = connectConfig.getResponseTimeout();
-        conn.setResponseTimeout(responseTimeout > 0 ? responseTimeout : 0);
-
-        int retrieveTimeout = connectConfig.getRetrieveTimeout();
-        conn.setRetrieveTimeout(retrieveTimeout > 0 ? retrieveTimeout : 0);
-
-        int idleTimeout = connectConfig.getIdleTimeout();
-        conn.setIdleTimeout(idleTimeout > 0 ? idleTimeout : 0);
-
-        int socketCloseDelay = connectConfig.getSocketCloseDelay();
-        conn.setSocketCloseDelay(socketCloseDelay > 0 ? socketCloseDelay : Connection.DEF_SOCKETDELAY);
-
-        int sendBufferSize = connectConfig.getSendBufferSize();
-        conn.setSendBufferSize(sendBufferSize > 0 ? sendBufferSize : 0);
-
-        int receiveBufferSize = connectConfig.getReceiveBufferSize();
-        conn.setReceiveBufferSize(receiveBufferSize > 0 ? receiveBufferSize : 0);
-
-        conn.setTcpNoDelay(!connectConfig.isNotTcpDelay());
+    private void configureDevice(Device device) {
+        device.addApplicationEntity(ae);
+        ((DicomServiceRegistry) device.getDimseRQHandler()).addDicomService(cstoreSCP);
     }
 
     /**
      * 给ApplicationEntity绑定链接
      *
      * @param conn
-     * @param ae
      * @param connectConfig
      * @throws Exception
      */
-    private void bindConnect(Connection conn, ApplicationEntity ae, ConnectConfig connectConfig) throws Exception {
+    private void bindConnect(Connection conn, ConnectConfig connectConfig) throws Exception {
         if (null == connectConfig) {
             throw new Exception("connectConfig 为null");
         } else {
@@ -429,22 +356,22 @@ public class StoreScpTask extends BaseTask {
         }
     }
 
-    private void configureStorageDirectory(StorageConfig sdConfig) {
-        if (null == sdConfig) {
-            sdConfig = new StorageConfig();
+    private void configureStorageDirectory() {
+        if (null == storageConfig) {
+            storageConfig = new StorageConfig();
         }
-        if (!sdConfig.isIgnore()) {
-            String directory = sdConfig.getDirectory();
+        if (!storageConfig.isIgnore()) {
+            String directory = storageConfig.getDirectory();
             setStorageDirectory(new File(StringUtils.isNotEmpty(directory) ? directory : StorageConfig.DEFAULT_DIRECTORY));
 
-            if (StringUtils.isNotEmpty(sdConfig.getFilePath())) {
-                //setStorageFilePathFormat(sdConfig.getFilePath());
+            if (StringUtils.isNotEmpty(storageConfig.getFilePath())) {
+                //setStorageFilePathFormat(storageConfig.getFilePath());
             }
         }
 
     }
 
-    private void configureTransferCapability(ApplicationEntity ae, TransferCapabilityConfig tcConfig) throws IOException {
+    private void configureTransferCapability() throws IOException {
         if (null == tcConfig) {
             return;
         }
@@ -466,14 +393,6 @@ public class StoreScpTask extends BaseTask {
 
     }
 
-    public ConnectConfig getConnectConfig() {
-        return connectConfig;
-    }
-
-    public void setConnectConfig(ConnectConfig connectConfig) {
-        this.connectConfig = connectConfig;
-    }
-
     public TransferCapabilityConfig getTcConfig() {
         return tcConfig;
     }
@@ -482,12 +401,12 @@ public class StoreScpTask extends BaseTask {
         this.tcConfig = tcConfig;
     }
 
-    public StorageConfig getSdConfig() {
-        return sdConfig;
+    public StorageConfig getStorageConfig() {
+        return storageConfig;
     }
 
-    public void setSdConfig(StorageConfig sdConfig) {
-        this.sdConfig = sdConfig;
+    public void setStorageConfig(StorageConfig storageConfig) {
+        this.storageConfig = storageConfig;
     }
 
     public UploadCase getUploadCase() {
@@ -508,5 +427,25 @@ public class StoreScpTask extends BaseTask {
 
     public BasicCStoreSCP getCstoreSCP() {
         return cstoreSCP;
+    }
+
+    public ConnectConfig getConnectConfig() {
+        return connectConfig;
+    }
+
+    public void setConnectConfig(ConnectConfig connectConfig) {
+        this.connectConfig = connectConfig;
+    }
+
+    public ApplicationEntity getAe() {
+        return ae;
+    }
+
+    public void setAe(ConnectConfig connectConfig) {
+        ae = new ApplicationEntity("*");
+        String aeTitle = connectConfig.getAeTitle();
+        ae.setAETitle(StringUtils.isNotEmpty(aeTitle) ? aeTitle : ConnectConfig.DEFAULT_AE_TITLE);
+        ae.setAssociationAcceptor(true);
+        ae.addConnection(connectConfig.getConn());
     }
 }
