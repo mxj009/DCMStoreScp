@@ -9,20 +9,20 @@ import javax.jms.*;
  * @create 2018/5/22
  * @since 1.0.0
  */
-public class MqClientUtils {
+public class ActiveMqClientUtils {
     Connection connection = null; // Session： 一个发送或接收消息的线程
     Session session; // Destination ：消息的目的地;消息发送给谁.
-    private static MqClientUtils mqClient = null;
+    private static ActiveMqClientUtils mqClient = null;
 
     //静态工厂方法
-    public static MqClientUtils getMqClient() {
+    public static ActiveMqClientUtils getMqClient() {
         if (mqClient == null) {
-            mqClient = new MqClientUtils();
+            mqClient = new ActiveMqClientUtils();
         }
         return mqClient;
     }
 
-    private MqClientUtils() {
+    private ActiveMqClientUtils() {
         // ConnectionFactory ：连接工厂，JMS 用它创建连接
         ConnectionFactory connectionFactory; // Connection ：JMS 客户端到JMS
         // Provider 的连接
@@ -30,7 +30,7 @@ public class MqClientUtils {
         // 构造ConnectionFactory实例对象，此处采用ActiveMq的实现jar
         connectionFactory = new ActiveMQConnectionFactory(
                 "tqhy",
-                "tqhy817@2017", "tcp://192.168.1.244:61686");
+                "tqhy817@2017", "tcp://192.168.1.160:5672");
         try { // 构造从工厂得到连接对象
             connection = connectionFactory.createConnection();
             // 启动

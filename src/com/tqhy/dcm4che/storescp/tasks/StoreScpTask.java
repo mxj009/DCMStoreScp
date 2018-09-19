@@ -11,7 +11,8 @@ import com.tqhy.dcm4che.storescp.configs.ConnectConfig;
 import com.tqhy.dcm4che.storescp.configs.StorageConfig;
 import com.tqhy.dcm4che.storescp.configs.TransferCapabilityConfig;
 import com.tqhy.dcm4che.storescp.utils.JsonUtils;
-import com.tqhy.dcm4che.storescp.utils.MqClientUtils;
+import com.tqhy.dcm4che.storescp.utils.ActiveMqClientUtils;
+import com.tqhy.dcm4che.storescp.utils.RabbitMqClientUtils;
 import com.tqhy.dcm4che.storescp.utils.StringUtils;
 import okhttp3.*;
 import org.dcm4che3.data.Attributes;
@@ -214,7 +215,9 @@ public class StoreScpTask extends BaseTask {
     private void uploadCasesByMq(UploadCase uploadCase) {
         String json = JsonUtils.obj2Json(uploadCase, UploadCase.class);
         System.out.println(getClass().getSimpleName() + " uploadCasesByMq() json is: " + json);
-        MqClientUtils.getMqClient().sendMessage(json, "img.dicom.queue");
+        //ActiveMqClientUtils.getMqClient().sendMessage(json, "img.dicom.queue");
+        RabbitMqClientUtils.getMqClient().sendMessage(json,"img.dicom.queue");
+        System.out.println("send msg finish...");
         releaseResources();
     }
 

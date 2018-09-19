@@ -56,7 +56,7 @@ public class JpgTask extends FileTask implements Runnable {
                 json = JsonUtils.obj2Json(uploadCase);
             }
             System.out.println("JpgTask send json: " + json);
-            MqClientUtils.getMqClient().sendMessage(json, "TEST".equals(target) ? "img.test.queue" : "img.dicom.queue");
+            ActiveMqClientUtils.getMqClient().sendMessage(json, "TEST".equals(target) ? "img.test.queue" : "img.dicom.queue");
         } catch (Exception e) {
             e.printStackTrace();
         } finally {

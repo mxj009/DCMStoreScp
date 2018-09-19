@@ -72,7 +72,7 @@ public class ImgCase {
     /**
      * 来源
      */
-    private String source;
+    private String sourceName;
 
     /**
      * 类型
@@ -183,12 +183,12 @@ public class ImgCase {
         this.sex = sex;
     }
 
-    public String getSource() {
-        return source;
+    public String getSourceName() {
+        return sourceName;
     }
 
-    public void setSource(String source) {
-        this.source = source;
+    public void setSourceName(String sourceName) {
+        this.sourceName = sourceName;
     }
 
     public String getType() {
@@ -222,7 +222,7 @@ public class ImgCase {
         this.setBatchNo(newCase.getBatchNo());
         this.setPart(newCase.getPart());
         this.setType(newCase.getType());
-        this.setSource(newCase.getSource());
+        this.setSourceName(newCase.getSourceName());
         this.setName(newCase.getName());
         this.setAge(newCase.getAge());
         this.setSex(newCase.getSex());
@@ -241,7 +241,7 @@ public class ImgCase {
                 ", sex='" + sex + '\'' +
                 ", batchNo='" + batchNo + '\'' +
                 ", imgCount=" + imgCount +
-                ", source='" + source + '\'' +
+                ", sourceName='" + sourceName + '\'' +
                 ", type='" + type + '\'' +
                 ", part='" + part + '\'' +
                 ", imgCenters=" + imgCenters +
@@ -261,13 +261,13 @@ public class ImgCase {
                 Objects.equals(name, imgCase.name) &&
                 Objects.equals(sex, imgCase.sex) &&
                 Objects.equals(batchNo, imgCase.batchNo) &&
-                Objects.equals(source, imgCase.source) &&
+                Objects.equals(sourceName, imgCase.sourceName) &&
                 Objects.equals(type, imgCase.type) &&
                 Objects.equals(part, imgCase.part);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(acquisitionDate, patientId, imgInfo, imgResult, age, name, sex, batchNo, source, type, part, serialNumber);
+        return Objects.hash(acquisitionDate, patientId, imgInfo, imgResult, age, name, sex, batchNo, sourceName, type, part, serialNumber);
     }
 }

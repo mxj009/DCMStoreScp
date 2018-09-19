@@ -142,7 +142,7 @@ public class InitScuTask extends BaseTask {
         OkHttpClient okHttpClient = new OkHttpClient();
         try {
             System.out.println("InitScuTask getInitDataByOkHttp() okhttp init...");
-            Request req = new Request.Builder().url("http://192.168.1.243:8887/api/list").build();
+            Request req = new Request.Builder().url("http://192.168.1.214:8887/api/list").build();
 
             Response resp = okHttpClient.newCall(req).execute();
             if (resp.isSuccessful()) {
