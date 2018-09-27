@@ -194,7 +194,7 @@ public class UploadCaseTask extends BaseTask {
             imgCase.setImgCount(1);
             imgCase.setBatchNo(assembledBatch.getBatch().getBatchNo());
             imgCase.setSourceName(assembledBatch.getSource());
-            imgCase.setType(assembledBatch.getType());
+            imgCase.setTypeName(assembledBatch.getType());
             imgCase.setPart(assembledBatch.getPart());
 
             reader.close();
