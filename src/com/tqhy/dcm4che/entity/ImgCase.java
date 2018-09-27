@@ -77,7 +77,7 @@ public class ImgCase {
     /**
      * 类型
      */
-    private String type;
+    private String typeName;
 
     /**
      * 部位
@@ -191,12 +191,12 @@ public class ImgCase {
         this.sourceName = sourceName;
     }
 
-    public String getType() {
-        return type;
+    public String getTypeName() {
+        return typeName;
     }
 
-    public void setType(String type) {
-        this.type = type;
+    public void setTypeName(String typeName) {
+        this.typeName = typeName;
     }
 
     public String getPart() {
@@ -221,7 +221,7 @@ public class ImgCase {
         this.setSerialNumber(newCase.getSerialNumber());
         this.setBatchNo(newCase.getBatchNo());
         this.setPart(newCase.getPart());
-        this.setType(newCase.getType());
+        this.setTypeName(newCase.getTypeName());
         this.setSourceName(newCase.getSourceName());
         this.setName(newCase.getName());
         this.setAge(newCase.getAge());
@@ -242,7 +242,7 @@ public class ImgCase {
                 ", batchNo='" + batchNo + '\'' +
                 ", imgCount=" + imgCount +
                 ", sourceName='" + sourceName + '\'' +
-                ", type='" + type + '\'' +
+                ", typeName='" + typeName + '\'' +
                 ", part='" + part + '\'' +
                 ", imgCenters=" + imgCenters +
                 ", serialNumber=" + serialNumber +
@@ -262,12 +262,12 @@ public class ImgCase {
                 Objects.equals(sex, imgCase.sex) &&
                 Objects.equals(batchNo, imgCase.batchNo) &&
                 Objects.equals(sourceName, imgCase.sourceName) &&
-                Objects.equals(type, imgCase.type) &&
+                Objects.equals(typeName, imgCase.typeName) &&
                 Objects.equals(part, imgCase.part);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(acquisitionDate, patientId, imgInfo, imgResult, age, name, sex, batchNo, sourceName, type, part, serialNumber);
+        return Objects.hash(acquisitionDate, patientId, imgInfo, imgResult, age, name, sex, batchNo, sourceName, typeName, part, serialNumber);
     }
 }
