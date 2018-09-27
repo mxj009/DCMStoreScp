@@ -41,7 +41,7 @@ public class ImgCenterUtils {
             String imgPath = jpgFile.getAbsolutePath();
             String pyPath = Main.rootPath + pyResource;
             System.out.println("python path is: " + pyPath);
-            String[] arguments = new String[]{"python", pyPath, imgPath};
+            String[] arguments = new String[]{"python3", pyPath, imgPath};
             try {
                 Process process = Runtime.getRuntime().exec(arguments);
                 process.waitFor();
